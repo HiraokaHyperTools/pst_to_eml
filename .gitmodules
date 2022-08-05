@@ -1,0 +1,4 @@
+[submodule "docs"]
+	path = docs
+	url = https://github.com/HiraokaHyperTools/pst_to_eml.git
+	branch = gh-pages
