@@ -1,6 +1,6 @@
 {
   "name": "@hiraokahypertools/pst_to_eml",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "author": "kenjiuno",
@@ -23,7 +23,8 @@
     "nodemailer": "^6.7.7"
   },
   "files": [
-    "lib"
+    "lib",
+    "cli.js"
   ],
   "engines": {
     "node": ">= 14"
@@ -34,5 +35,6 @@
     "prepare": "npm run build && npm run test",
     "mocha": "set NODE_ENV=test && mocha",
     "dr": "npm publish --dry-run"
-  }
+  },
+  "bin": "bin/pst_to_eml"
 }
