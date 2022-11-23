@@ -7861,6 +7861,9 @@ class PFolder {
     }
 }
 exports.PFolder = PFolder;
+const MAPI_TO = 1;
+const MAPI_CC = 2;
+const MAPI_BCC = 3;
 class PItem {
     constructor(email) {
         this.email = email;
@@ -7908,14 +7911,14 @@ class PItem {
             from: (0, utils_1.formatFrom)(email.senderName, email.senderEmailAddress),
             to: (0, utils_1.applyFallbackRecipients)(recipients
                 .map(({ name, email, recipType }) => {
-                return recipType === "to" ? { name, email } : null;
+                return recipType === MAPI_TO ? (0, utils_1.formatAddress)(name, email) : null;
             })
                 .filter((entry) => entry !== null), { name: "undisclosed-recipients" }),
             cc: recipients
-                .map(({ name, email, recipType }) => recipType === "cc" ? { name, email } : null)
+                .map(({ name, email, recipType }) => recipType === MAPI_CC ? (0, utils_1.formatAddress)(name, email) : null)
                 .filter((entry) => entry !== null),
             bcc: recipients
-                .map(({ name, email, recipType }) => recipType === "bcc" ? { name, email } : null)
+                .map(({ name, email, recipType }) => recipType === MAPI_BCC ? (0, utils_1.formatAddress)(name, email) : null)
                 .filter((entry) => entry !== null),
             subject: email.subject,
             text: email.body,
@@ -8063,7 +8066,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.convertToBuffer = exports.changeFileExtension = exports.applyFallbackRecipients = exports.formatFrom = void 0;
+exports.formatAddress = exports.convertToBuffer = exports.changeFileExtension = exports.applyFallbackRecipients = exports.formatFrom = void 0;
 const path_1 = __importDefault(__webpack_require__(6470));
 /**
  *
@@ -8109,6 +8112,19 @@ function convertToBuffer(attachmentStream) {
     return Buffer.alloc(0);
 }
 exports.convertToBuffer = convertToBuffer;
+/**
+ *
+ * @internal
+ */
+function formatAddress(name, email) {
+    if (name) {
+        return `${email} <${name}>`;
+    }
+    else {
+        return email;
+    }
+}
+exports.formatAddress = formatAddress;
 
 
 /***/ }),
