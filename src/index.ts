@@ -3,7 +3,7 @@ import { PSTFile } from '@hiraokahypertools/pst-extractor';
 import { PSTFolder } from '@hiraokahypertools/pst-extractor';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { Buffer } from 'buffer';
-import { applyFallbackRecipients, changeFileExtension, convertToBuffer, formatFrom } from './utils';
+import { applyFallbackRecipients, changeFileExtension, convertToBuffer, formatAddress, formatFrom } from './utils';
 import { convertVLines } from './vLines';
 
 export async function wrapPstFile(
@@ -156,6 +156,10 @@ export interface MsgConverterOptions {
 
 }
 
+const MAPI_TO = 1;
+const MAPI_CC = 2;
+const MAPI_BCC = 3;
+
 export class PItem implements IPItem {
   private email: PSTMessage;
 
@@ -202,7 +206,7 @@ export class PItem implements IPItem {
         name: entry.displayName,
         email: entry.emailAddress,
         recipType: entry.recipientType,
-      })
+      });
     }
 
     const attachmentsRefined = [];
@@ -215,18 +219,18 @@ export class PItem implements IPItem {
         recipients
           .map(
             ({ name, email, recipType }) => {
-              return recipType === "to" ? { name, email } : null
+              return recipType === MAPI_TO ? formatAddress(name, email) : null
             }
           )
           .filter((entry) => entry !== null), { name: "undisclosed-recipients" }),
       cc: recipients
         .map(({ name, email, recipType }) =>
-          recipType === "cc" ? { name, email } : null
+          recipType === MAPI_CC ? formatAddress(name, email) : null
         )
         .filter((entry) => entry !== null),
       bcc: recipients
         .map(({ name, email, recipType }) =>
-          recipType === "bcc" ? { name, email } : null
+          recipType === MAPI_BCC ? formatAddress(name, email) : null
         )
         .filter((entry) => entry !== null),
       subject: email.subject,

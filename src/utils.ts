@@ -43,3 +43,16 @@ export function convertToBuffer(attachmentStream: ArrayBuffer | undefined): Buff
   }
   return Buffer.alloc(0);
 }
+
+/**
+ * 
+ * @internal
+ */
+ export function formatAddress(name: string, email: string): string | null {
+  if (name) {
+    return `${email} <${name}>`;
+  }
+  else {
+    return email;
+  }
+}
