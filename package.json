@@ -18,9 +18,10 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.2",
+    "@hiraokahypertools/pst-extractor": "../pst-extractor",
     "commander": "^9.4.0",
-    "nodemailer": "^6.7.7"
+    "nodemailer": "^6.7.7",
+    "pst-extractor": "^1.9.0"
   },
   "files": [
     "lib",

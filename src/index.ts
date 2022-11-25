@@ -5,6 +5,7 @@ import MailComposer from 'nodemailer/lib/mail-composer';
 import { Buffer } from 'buffer';
 import { applyFallbackRecipients, changeFileExtension, convertToBuffer, formatAddress, formatFrom } from './utils';
 import { convertVLines } from './vLines';
+import { FasterEmail } from '@hiraokahypertools/pst-extractor/dist/FasterEmail';
 
 export async function wrapPstFile(
   pstFile: PSTFile
@@ -53,7 +54,7 @@ export interface IPItem extends IPNode {
 
 export interface IPFolder extends IPNode {
   subFolders(): Promise<PFolder[]>;
-  items(): Promise<PItem[]>;
+  items(options?: FolderItemsOptions): Promise<PItem[]>;
 }
 
 export interface IPRoot extends IPFolder {
@@ -105,6 +106,10 @@ export class PRoot implements IPRoot {
   }
 }
 
+export interface FolderItemsOptions {
+  progress?: (current: number, count: number) => void;
+}
+
 export class PFolder implements IPFolder {
   private folder: PSTFolder;
 
@@ -129,13 +134,16 @@ export class PFolder implements IPFolder {
     return list;
   }
 
-  async items(): Promise<PItem[]> {
+  async items(options?: FolderItemsOptions): Promise<PItem[]> {
     const list: PItem[] = [];
 
-    if (this.folder.contentCount > 0) {
-      const emails: PSTMessage[] = (await this.folder.getEmails());
-      for (let email of emails) {
-        list.push(new PItem(email));
+    if (1 <= this.folder.contentCount) {
+      const fasterList = await this.folder.getFasterEmailList({
+        progress: options?.progress,
+      });
+
+      for (let faster of fasterList) {
+        list.push(new PItem(faster));
       }
     }
 
@@ -161,14 +169,14 @@ const MAPI_CC = 2;
 const MAPI_BCC = 3;
 
 export class PItem implements IPItem {
-  private email: PSTMessage;
+  private faster: FasterEmail;
 
   async displayName(): Promise<string> {
-    return this.email.subject || this.email.displayName;
+    return this.faster.displayName;
   }
 
-  constructor(email: PSTMessage) {
-    this.email = email;
+  constructor(email: FasterEmail) {
+    this.faster = email;
   }
 
   /**
@@ -178,7 +186,7 @@ export class PItem implements IPItem {
    * - This will return `IPM.Contact` for contact.
    * - This will return `IPM.Note` for EML.
    */
-  public get messageClass(): string { return this.email.messageClass; }
+  public get messageClass(): string { return this.faster.messageClass; }
 
   /**
    * Assume this is a mail message and then convert to EML.
@@ -195,7 +203,7 @@ export class PItem implements IPItem {
    * @returns EML file
    */
   async toEmlBuffer(options: MsgConverterOptions): Promise<Buffer> {
-    return await this.toEmlFrom(options, this.email);
+    return await this.toEmlFrom(options, await this.faster.getMessage());
   }
 
   private async toEmlFrom(options: MsgConverterOptions, email: PSTMessage): Promise<Buffer> {
@@ -298,7 +306,7 @@ export class PItem implements IPItem {
   async toVCardStr(options: MsgConverterOptions): Promise<string> {
     return (await this.toVCardStrFrom(
       options,
-      this.email as PSTContact
+      (await this.faster.getMessage()) as PSTContact
     ));
   }
 
