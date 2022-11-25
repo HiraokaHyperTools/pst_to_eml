@@ -4039,34 +4039,46 @@ class PSTFolder extends PSTObject_class_1.PSTObject {
                 else {
                     // trying to read emailsTable PSTTable7C
                     const contentsTableNode = this._node.getSiblingNode(PSTUtil_class_1.PSTUtil.NID_TYPE_CONTENTS_TABLE);
+                    let doFallback = true;
                     if (contentsTableNode !== undefined) {
-                        const contentsTableNodeReader = contentsTableNode.getSubNode();
-                        const heap = yield (0, PHUtil_1.getHeapFrom)(contentsTableNodeReader);
-                        const tc = yield (0, TableContextUtil_1.getTableContext)(heap, this._rootProvider.resolver);
-                        const rows = yield tc.rows();
-                        const orderOfNodes = [];
-                        for (let row of rows) {
-                            const props = (0, PAUtil_1.createPropertyFinder)(yield row.list());
-                            const prop = props.findByKey(0x67f2);
-                            if (prop !== undefined && typeof prop.value === 'number') {
-                                orderOfNodes.push({ nodeId: prop.value, propertyFinder: props });
+                        try {
+                            const contentsTableNodeReader = contentsTableNode.getSubNode();
+                            const heap = yield (0, PHUtil_1.getHeapFrom)(contentsTableNodeReader);
+                            const tc = yield (0, TableContextUtil_1.getTableContext)(heap, this._rootProvider.resolver);
+                            const rows = yield tc.rows();
+                            const orderOfNodes = [];
+                            for (let row of rows) {
+                                const props = (0, PAUtil_1.createPropertyFinder)(yield row.list());
+                                const prop = props.findByKey(0x67f2);
+                                if (prop !== undefined && typeof prop.value === 'number') {
+                                    orderOfNodes.push({ nodeId: prop.value, propertyFinder: props });
+                                }
                             }
+                            const childNodeIdMap = new Map(this._node.getChildren()
+                                .map(node => [node.nodeId, node]));
+                            for (let { nodeId, propertyFinder } of orderOfNodes) {
+                                const found = childNodeIdMap.get(nodeId);
+                                if (found !== undefined) {
+                                    targets.push({
+                                        node: found,
+                                        propertyFinder: propertyFinder,
+                                    });
+                                }
+                            }
+                            doFallback = false;
                         }
-                        const childNodeIdMap = new Map(this._node.getChildren()
-                            .map(node => [node.nodeId, node]));
-                        for (let { nodeId, propertyFinder } of orderOfNodes) {
-                            const found = childNodeIdMap.get(nodeId);
-                            if (found !== undefined) {
-                                targets.push({
-                                    node: found,
-                                    propertyFinder: propertyFinder,
-                                });
-                            }
+                        catch (ex) {
+                            // There are some unknown cases that TC of email list is broken.
+                            // Especially on ost file.
+                            // Thus fallback is still required.
+                            // .../Folder#0 // Error: getTableContext.list(rowIndex=0) resolving property key=0x001a type=0x001f of subNode of nodeId=32974,nidType=14 failure --> Error: heap=0x11604460 of subNode of nodeId=32974,nidType=14 not found
+                            // In this case, Outlook 2003 will try to recover the broken TC of that folder with a kind of fallback mode.
                         }
                     }
-                    else {
+                    if (doFallback) {
                         //console.log("fallback");
                         // fallback to children as listed in the descriptor b-tree
+                        targets.length = 0;
                         for (let node of this._node.getChildren()) {
                             if (this.getNodeType(node.nodeId) === PSTUtil_class_1.PSTUtil.NID_TYPE_NORMAL_MESSAGE) {
                                 targets.push({ node, propertyFinder: undefined });
@@ -7066,6 +7078,7 @@ const PT_MV_STRING8 = 0x101E;
 const PT_MV_BINARY = 0x1102;
 const PT_MV_LONG = 0x1003;
 const PT_MV_CLSID = 0x1048;
+const PT_MVPV_BINARY = 0x2102;
 typeConverters[PT_SHORT] = (arg) => __awaiter(void 0, void 0, void 0, function* () {
     return arg.view.getInt16(0, true);
 });
@@ -7219,6 +7232,25 @@ typeConverters[PT_MV_STRING8] = (arg) => __awaiter(void 0, void 0, void 0, funct
                 const to = view.getUint32(4 + 4 * (x + 1), true);
                 const elementBytes = bytes.slice(from, to);
                 list.push(yield arg.convertAnsiString(elementBytes));
+            }
+        }
+    }
+    return list;
+});
+typeConverters[PT_MVPV_BINARY] = (arg) => __awaiter(void 0, void 0, void 0, function* () {
+    // not sure
+    const heap = arg.view.getUint32(0, true);
+    const list = [];
+    if (heap !== 0) {
+        const bytes = yield arg.resolveHeap(heap);
+        if (bytes !== undefined) {
+            const view = new DataView(bytes);
+            const count = view.getUint32(0, true);
+            for (let x = 0; x < count - 1; x++) {
+                const from = view.getUint32(4 + 4 * (x), true);
+                const to = view.getUint32(4 + 4 * (x + 1), true);
+                const elementBytes = bytes.slice(from, to);
+                list.push(elementBytes);
             }
         }
     }
@@ -12209,34 +12241,46 @@ class PSTFolder extends PSTObject_class_1.PSTObject {
                 else {
                     // trying to read emailsTable PSTTable7C
                     const contentsTableNode = this._node.getSiblingNode(PSTUtil_class_1.PSTUtil.NID_TYPE_CONTENTS_TABLE);
+                    let doFallback = true;
                     if (contentsTableNode !== undefined) {
-                        const contentsTableNodeReader = contentsTableNode.getSubNode();
-                        const heap = yield (0, PHUtil_1.getHeapFrom)(contentsTableNodeReader);
-                        const tc = yield (0, TableContextUtil_1.getTableContext)(heap, this._rootProvider.resolver);
-                        const rows = yield tc.rows();
-                        const orderOfNodes = [];
-                        for (let row of rows) {
-                            const props = (0, PAUtil_1.createPropertyFinder)(yield row.list());
-                            const prop = props.findByKey(0x67f2);
-                            if (prop !== undefined && typeof prop.value === 'number') {
-                                orderOfNodes.push({ nodeId: prop.value, propertyFinder: props });
+                        try {
+                            const contentsTableNodeReader = contentsTableNode.getSubNode();
+                            const heap = yield (0, PHUtil_1.getHeapFrom)(contentsTableNodeReader);
+                            const tc = yield (0, TableContextUtil_1.getTableContext)(heap, this._rootProvider.resolver);
+                            const rows = yield tc.rows();
+                            const orderOfNodes = [];
+                            for (let row of rows) {
+                                const props = (0, PAUtil_1.createPropertyFinder)(yield row.list());
+                                const prop = props.findByKey(0x67f2);
+                                if (prop !== undefined && typeof prop.value === 'number') {
+                                    orderOfNodes.push({ nodeId: prop.value, propertyFinder: props });
+                                }
                             }
+                            const childNodeIdMap = new Map(this._node.getChildren()
+                                .map(node => [node.nodeId, node]));
+                            for (let { nodeId, propertyFinder } of orderOfNodes) {
+                                const found = childNodeIdMap.get(nodeId);
+                                if (found !== undefined) {
+                                    targets.push({
+                                        node: found,
+                                        propertyFinder: propertyFinder,
+                                    });
+                                }
+                            }
+                            doFallback = false;
                         }
-                        const childNodeIdMap = new Map(this._node.getChildren()
-                            .map(node => [node.nodeId, node]));
-                        for (let { nodeId, propertyFinder } of orderOfNodes) {
-                            const found = childNodeIdMap.get(nodeId);
-                            if (found !== undefined) {
-                                targets.push({
-                                    node: found,
-                                    propertyFinder: propertyFinder,
-                                });
-                            }
+                        catch (ex) {
+                            // There are some unknown cases that TC of email list is broken.
+                            // Especially on ost file.
+                            // Thus fallback is still required.
+                            // .../Folder#0 // Error: getTableContext.list(rowIndex=0) resolving property key=0x001a type=0x001f of subNode of nodeId=32974,nidType=14 failure --> Error: heap=0x11604460 of subNode of nodeId=32974,nidType=14 not found
+                            // In this case, Outlook 2003 will try to recover the broken TC of that folder with a kind of fallback mode.
                         }
                     }
-                    else {
+                    if (doFallback) {
                         //console.log("fallback");
                         // fallback to children as listed in the descriptor b-tree
+                        targets.length = 0;
                         for (let node of this._node.getChildren()) {
                             if (this.getNodeType(node.nodeId) === PSTUtil_class_1.PSTUtil.NID_TYPE_NORMAL_MESSAGE) {
                                 targets.push({ node, propertyFinder: undefined });
@@ -15236,6 +15280,7 @@ const PT_MV_STRING8 = 0x101E;
 const PT_MV_BINARY = 0x1102;
 const PT_MV_LONG = 0x1003;
 const PT_MV_CLSID = 0x1048;
+const PT_MVPV_BINARY = 0x2102;
 typeConverters[PT_SHORT] = (arg) => __awaiter(void 0, void 0, void 0, function* () {
     return arg.view.getInt16(0, true);
 });
@@ -15389,6 +15434,25 @@ typeConverters[PT_MV_STRING8] = (arg) => __awaiter(void 0, void 0, void 0, funct
                 const to = view.getUint32(4 + 4 * (x + 1), true);
                 const elementBytes = bytes.slice(from, to);
                 list.push(yield arg.convertAnsiString(elementBytes));
+            }
+        }
+    }
+    return list;
+});
+typeConverters[PT_MVPV_BINARY] = (arg) => __awaiter(void 0, void 0, void 0, function* () {
+    // not sure
+    const heap = arg.view.getUint32(0, true);
+    const list = [];
+    if (heap !== 0) {
+        const bytes = yield arg.resolveHeap(heap);
+        if (bytes !== undefined) {
+            const view = new DataView(bytes);
+            const count = view.getUint32(0, true);
+            for (let x = 0; x < count - 1; x++) {
+                const from = view.getUint32(4 + 4 * (x), true);
+                const to = view.getUint32(4 + 4 * (x + 1), true);
+                const elementBytes = bytes.slice(from, to);
+                list.push(elementBytes);
             }
         }
     }
@@ -78565,6 +78629,620 @@ var BehaviorSubject = (function (_super) {
 }(Subject));
 
 //# sourceMappingURL=BehaviorSubject.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/scheduler/Action.js
+
+
+var Action = (function (_super) {
+    __extends(Action, _super);
+    function Action(scheduler, work) {
+        return _super.call(this) || this;
+    }
+    Action.prototype.schedule = function (state, delay) {
+        if (delay === void 0) { delay = 0; }
+        return this;
+    };
+    return Action;
+}(Subscription));
+
+//# sourceMappingURL=Action.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/scheduler/intervalProvider.js
+
+var intervalProvider = {
+    setInterval: function (handler, timeout) {
+        var args = [];
+        for (var _i = 2; _i < arguments.length; _i++) {
+            args[_i - 2] = arguments[_i];
+        }
+        var delegate = intervalProvider.delegate;
+        if (delegate === null || delegate === void 0 ? void 0 : delegate.setInterval) {
+            return delegate.setInterval.apply(delegate, __spreadArray([handler, timeout], __read(args)));
+        }
+        return setInterval.apply(void 0, __spreadArray([handler, timeout], __read(args)));
+    },
+    clearInterval: function (handle) {
+        var delegate = intervalProvider.delegate;
+        return ((delegate === null || delegate === void 0 ? void 0 : delegate.clearInterval) || clearInterval)(handle);
+    },
+    delegate: undefined,
+};
+//# sourceMappingURL=intervalProvider.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/scheduler/AsyncAction.js
+
+
+
+
+var AsyncAction = (function (_super) {
+    __extends(AsyncAction, _super);
+    function AsyncAction(scheduler, work) {
+        var _this = _super.call(this, scheduler, work) || this;
+        _this.scheduler = scheduler;
+        _this.work = work;
+        _this.pending = false;
+        return _this;
+    }
+    AsyncAction.prototype.schedule = function (state, delay) {
+        if (delay === void 0) { delay = 0; }
+        if (this.closed) {
+            return this;
+        }
+        this.state = state;
+        var id = this.id;
+        var scheduler = this.scheduler;
+        if (id != null) {
+            this.id = this.recycleAsyncId(scheduler, id, delay);
+        }
+        this.pending = true;
+        this.delay = delay;
+        this.id = this.id || this.requestAsyncId(scheduler, this.id, delay);
+        return this;
+    };
+    AsyncAction.prototype.requestAsyncId = function (scheduler, _id, delay) {
+        if (delay === void 0) { delay = 0; }
+        return intervalProvider.setInterval(scheduler.flush.bind(scheduler, this), delay);
+    };
+    AsyncAction.prototype.recycleAsyncId = function (_scheduler, id, delay) {
+        if (delay === void 0) { delay = 0; }
+        if (delay != null && this.delay === delay && this.pending === false) {
+            return id;
+        }
+        intervalProvider.clearInterval(id);
+        return undefined;
+    };
+    AsyncAction.prototype.execute = function (state, delay) {
+        if (this.closed) {
+            return new Error('executing a cancelled action');
+        }
+        this.pending = false;
+        var error = this._execute(state, delay);
+        if (error) {
+            return error;
+        }
+        else if (this.pending === false && this.id != null) {
+            this.id = this.recycleAsyncId(this.scheduler, this.id, null);
+        }
+    };
+    AsyncAction.prototype._execute = function (state, _delay) {
+        var errored = false;
+        var errorValue;
+        try {
+            this.work(state);
+        }
+        catch (e) {
+            errored = true;
+            errorValue = e ? e : new Error('Scheduled action threw falsy error');
+        }
+        if (errored) {
+            this.unsubscribe();
+            return errorValue;
+        }
+    };
+    AsyncAction.prototype.unsubscribe = function () {
+        if (!this.closed) {
+            var _a = this, id = _a.id, scheduler = _a.scheduler;
+            var actions = scheduler.actions;
+            this.work = this.state = this.scheduler = null;
+            this.pending = false;
+            arrRemove(actions, this);
+            if (id != null) {
+                this.id = this.recycleAsyncId(scheduler, id, null);
+            }
+            this.delay = null;
+            _super.prototype.unsubscribe.call(this);
+        }
+    };
+    return AsyncAction;
+}(Action));
+
+//# sourceMappingURL=AsyncAction.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/scheduler/dateTimestampProvider.js
+var dateTimestampProvider = {
+    now: function () {
+        return (dateTimestampProvider.delegate || Date).now();
+    },
+    delegate: undefined,
+};
+//# sourceMappingURL=dateTimestampProvider.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/Scheduler.js
+
+var Scheduler = (function () {
+    function Scheduler(schedulerActionCtor, now) {
+        if (now === void 0) { now = Scheduler.now; }
+        this.schedulerActionCtor = schedulerActionCtor;
+        this.now = now;
+    }
+    Scheduler.prototype.schedule = function (work, delay, state) {
+        if (delay === void 0) { delay = 0; }
+        return new this.schedulerActionCtor(this, work).schedule(state, delay);
+    };
+    Scheduler.now = dateTimestampProvider.now;
+    return Scheduler;
+}());
+
+//# sourceMappingURL=Scheduler.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/scheduler/AsyncScheduler.js
+
+
+var AsyncScheduler = (function (_super) {
+    __extends(AsyncScheduler, _super);
+    function AsyncScheduler(SchedulerAction, now) {
+        if (now === void 0) { now = Scheduler.now; }
+        var _this = _super.call(this, SchedulerAction, now) || this;
+        _this.actions = [];
+        _this._active = false;
+        _this._scheduled = undefined;
+        return _this;
+    }
+    AsyncScheduler.prototype.flush = function (action) {
+        var actions = this.actions;
+        if (this._active) {
+            actions.push(action);
+            return;
+        }
+        var error;
+        this._active = true;
+        do {
+            if ((error = action.execute(action.state, action.delay))) {
+                break;
+            }
+        } while ((action = actions.shift()));
+        this._active = false;
+        if (error) {
+            while ((action = actions.shift())) {
+                action.unsubscribe();
+            }
+            throw error;
+        }
+    };
+    return AsyncScheduler;
+}(Scheduler));
+
+//# sourceMappingURL=AsyncScheduler.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/scheduler/async.js
+
+
+var asyncScheduler = new AsyncScheduler(AsyncAction);
+var async_async = asyncScheduler;
+//# sourceMappingURL=async.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/lift.js
+
+function hasLift(source) {
+    return isFunction(source === null || source === void 0 ? void 0 : source.lift);
+}
+function operate(init) {
+    return function (source) {
+        if (hasLift(source)) {
+            return source.lift(function (liftedSource) {
+                try {
+                    return init(liftedSource, this);
+                }
+                catch (err) {
+                    this.error(err);
+                }
+            });
+        }
+        throw new TypeError('Unable to lift unknown Observable type');
+    };
+}
+//# sourceMappingURL=lift.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/operators/OperatorSubscriber.js
+
+
+function createOperatorSubscriber(destination, onNext, onComplete, onError, onFinalize) {
+    return new OperatorSubscriber(destination, onNext, onComplete, onError, onFinalize);
+}
+var OperatorSubscriber = (function (_super) {
+    __extends(OperatorSubscriber, _super);
+    function OperatorSubscriber(destination, onNext, onComplete, onError, onFinalize, shouldUnsubscribe) {
+        var _this = _super.call(this, destination) || this;
+        _this.onFinalize = onFinalize;
+        _this.shouldUnsubscribe = shouldUnsubscribe;
+        _this._next = onNext
+            ? function (value) {
+                try {
+                    onNext(value);
+                }
+                catch (err) {
+                    destination.error(err);
+                }
+            }
+            : _super.prototype._next;
+        _this._error = onError
+            ? function (err) {
+                try {
+                    onError(err);
+                }
+                catch (err) {
+                    destination.error(err);
+                }
+                finally {
+                    this.unsubscribe();
+                }
+            }
+            : _super.prototype._error;
+        _this._complete = onComplete
+            ? function () {
+                try {
+                    onComplete();
+                }
+                catch (err) {
+                    destination.error(err);
+                }
+                finally {
+                    this.unsubscribe();
+                }
+            }
+            : _super.prototype._complete;
+        return _this;
+    }
+    OperatorSubscriber.prototype.unsubscribe = function () {
+        var _a;
+        if (!this.shouldUnsubscribe || this.shouldUnsubscribe()) {
+            var closed_1 = this.closed;
+            _super.prototype.unsubscribe.call(this);
+            !closed_1 && ((_a = this.onFinalize) === null || _a === void 0 ? void 0 : _a.call(this));
+        }
+    };
+    return OperatorSubscriber;
+}(Subscriber));
+
+//# sourceMappingURL=OperatorSubscriber.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/isArrayLike.js
+var isArrayLike = (function (x) { return x && typeof x.length === 'number' && typeof x !== 'function'; });
+//# sourceMappingURL=isArrayLike.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/isPromise.js
+
+function isPromise(value) {
+    return isFunction(value === null || value === void 0 ? void 0 : value.then);
+}
+//# sourceMappingURL=isPromise.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/isInteropObservable.js
+
+
+function isInteropObservable(input) {
+    return isFunction(input[observable]);
+}
+//# sourceMappingURL=isInteropObservable.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/isAsyncIterable.js
+
+function isAsyncIterable(obj) {
+    return Symbol.asyncIterator && isFunction(obj === null || obj === void 0 ? void 0 : obj[Symbol.asyncIterator]);
+}
+//# sourceMappingURL=isAsyncIterable.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/throwUnobservableError.js
+function createInvalidObservableTypeError(input) {
+    return new TypeError("You provided " + (input !== null && typeof input === 'object' ? 'an invalid object' : "'" + input + "'") + " where a stream was expected. You can provide an Observable, Promise, ReadableStream, Array, AsyncIterable, or Iterable.");
+}
+//# sourceMappingURL=throwUnobservableError.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/symbol/iterator.js
+function getSymbolIterator() {
+    if (typeof Symbol !== 'function' || !Symbol.iterator) {
+        return '@@iterator';
+    }
+    return Symbol.iterator;
+}
+var iterator = getSymbolIterator();
+//# sourceMappingURL=iterator.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/isIterable.js
+
+
+function isIterable(input) {
+    return isFunction(input === null || input === void 0 ? void 0 : input[iterator]);
+}
+//# sourceMappingURL=isIterable.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/isReadableStreamLike.js
+
+
+function readableStreamLikeToAsyncGenerator(readableStream) {
+    return __asyncGenerator(this, arguments, function readableStreamLikeToAsyncGenerator_1() {
+        var reader, _a, value, done;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    reader = readableStream.getReader();
+                    _b.label = 1;
+                case 1:
+                    _b.trys.push([1, , 9, 10]);
+                    _b.label = 2;
+                case 2:
+                    if (false) {}
+                    return [4, __await(reader.read())];
+                case 3:
+                    _a = _b.sent(), value = _a.value, done = _a.done;
+                    if (!done) return [3, 5];
+                    return [4, __await(void 0)];
+                case 4: return [2, _b.sent()];
+                case 5: return [4, __await(value)];
+                case 6: return [4, _b.sent()];
+                case 7:
+                    _b.sent();
+                    return [3, 2];
+                case 8: return [3, 10];
+                case 9:
+                    reader.releaseLock();
+                    return [7];
+                case 10: return [2];
+            }
+        });
+    });
+}
+function isReadableStreamLike(obj) {
+    return isFunction(obj === null || obj === void 0 ? void 0 : obj.getReader);
+}
+//# sourceMappingURL=isReadableStreamLike.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/observable/innerFrom.js
+
+
+
+
+
+
+
+
+
+
+
+
+function innerFrom(input) {
+    if (input instanceof Observable) {
+        return input;
+    }
+    if (input != null) {
+        if (isInteropObservable(input)) {
+            return fromInteropObservable(input);
+        }
+        if (isArrayLike(input)) {
+            return fromArrayLike(input);
+        }
+        if (isPromise(input)) {
+            return fromPromise(input);
+        }
+        if (isAsyncIterable(input)) {
+            return fromAsyncIterable(input);
+        }
+        if (isIterable(input)) {
+            return fromIterable(input);
+        }
+        if (isReadableStreamLike(input)) {
+            return fromReadableStreamLike(input);
+        }
+    }
+    throw createInvalidObservableTypeError(input);
+}
+function fromInteropObservable(obj) {
+    return new Observable(function (subscriber) {
+        var obs = obj[observable]();
+        if (isFunction(obs.subscribe)) {
+            return obs.subscribe(subscriber);
+        }
+        throw new TypeError('Provided object does not correctly implement Symbol.observable');
+    });
+}
+function fromArrayLike(array) {
+    return new Observable(function (subscriber) {
+        for (var i = 0; i < array.length && !subscriber.closed; i++) {
+            subscriber.next(array[i]);
+        }
+        subscriber.complete();
+    });
+}
+function fromPromise(promise) {
+    return new Observable(function (subscriber) {
+        promise
+            .then(function (value) {
+            if (!subscriber.closed) {
+                subscriber.next(value);
+                subscriber.complete();
+            }
+        }, function (err) { return subscriber.error(err); })
+            .then(null, reportUnhandledError);
+    });
+}
+function fromIterable(iterable) {
+    return new Observable(function (subscriber) {
+        var e_1, _a;
+        try {
+            for (var iterable_1 = __values(iterable), iterable_1_1 = iterable_1.next(); !iterable_1_1.done; iterable_1_1 = iterable_1.next()) {
+                var value = iterable_1_1.value;
+                subscriber.next(value);
+                if (subscriber.closed) {
+                    return;
+                }
+            }
+        }
+        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+        finally {
+            try {
+                if (iterable_1_1 && !iterable_1_1.done && (_a = iterable_1.return)) _a.call(iterable_1);
+            }
+            finally { if (e_1) throw e_1.error; }
+        }
+        subscriber.complete();
+    });
+}
+function fromAsyncIterable(asyncIterable) {
+    return new Observable(function (subscriber) {
+        process(asyncIterable, subscriber).catch(function (err) { return subscriber.error(err); });
+    });
+}
+function fromReadableStreamLike(readableStream) {
+    return fromAsyncIterable(readableStreamLikeToAsyncGenerator(readableStream));
+}
+function process(asyncIterable, subscriber) {
+    var asyncIterable_1, asyncIterable_1_1;
+    var e_2, _a;
+    return __awaiter(this, void 0, void 0, function () {
+        var value, e_2_1;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    _b.trys.push([0, 5, 6, 11]);
+                    asyncIterable_1 = __asyncValues(asyncIterable);
+                    _b.label = 1;
+                case 1: return [4, asyncIterable_1.next()];
+                case 2:
+                    if (!(asyncIterable_1_1 = _b.sent(), !asyncIterable_1_1.done)) return [3, 4];
+                    value = asyncIterable_1_1.value;
+                    subscriber.next(value);
+                    if (subscriber.closed) {
+                        return [2];
+                    }
+                    _b.label = 3;
+                case 3: return [3, 1];
+                case 4: return [3, 11];
+                case 5:
+                    e_2_1 = _b.sent();
+                    e_2 = { error: e_2_1 };
+                    return [3, 11];
+                case 6:
+                    _b.trys.push([6, , 9, 10]);
+                    if (!(asyncIterable_1_1 && !asyncIterable_1_1.done && (_a = asyncIterable_1.return))) return [3, 8];
+                    return [4, _a.call(asyncIterable_1)];
+                case 7:
+                    _b.sent();
+                    _b.label = 8;
+                case 8: return [3, 10];
+                case 9:
+                    if (e_2) throw e_2.error;
+                    return [7];
+                case 10: return [7];
+                case 11:
+                    subscriber.complete();
+                    return [2];
+            }
+        });
+    });
+}
+//# sourceMappingURL=innerFrom.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/operators/throttle.js
+
+
+
+var defaultThrottleConfig = {
+    leading: true,
+    trailing: false,
+};
+function throttle(durationSelector, config) {
+    if (config === void 0) { config = defaultThrottleConfig; }
+    return operate(function (source, subscriber) {
+        var leading = config.leading, trailing = config.trailing;
+        var hasValue = false;
+        var sendValue = null;
+        var throttled = null;
+        var isComplete = false;
+        var endThrottling = function () {
+            throttled === null || throttled === void 0 ? void 0 : throttled.unsubscribe();
+            throttled = null;
+            if (trailing) {
+                send();
+                isComplete && subscriber.complete();
+            }
+        };
+        var cleanupThrottling = function () {
+            throttled = null;
+            isComplete && subscriber.complete();
+        };
+        var startThrottle = function (value) {
+            return (throttled = innerFrom(durationSelector(value)).subscribe(createOperatorSubscriber(subscriber, endThrottling, cleanupThrottling)));
+        };
+        var send = function () {
+            if (hasValue) {
+                hasValue = false;
+                var value = sendValue;
+                sendValue = null;
+                subscriber.next(value);
+                !isComplete && startThrottle(value);
+            }
+        };
+        source.subscribe(createOperatorSubscriber(subscriber, function (value) {
+            hasValue = true;
+            sendValue = value;
+            !(throttled && !throttled.closed) && (leading ? send() : startThrottle(value));
+        }, function () {
+            isComplete = true;
+            !(trailing && hasValue && throttled && !throttled.closed) && subscriber.complete();
+        }));
+    });
+}
+//# sourceMappingURL=throttle.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/isScheduler.js
+
+function isScheduler(value) {
+    return value && isFunction(value.schedule);
+}
+//# sourceMappingURL=isScheduler.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/util/isDate.js
+function isValidDate(value) {
+    return value instanceof Date && !isNaN(value);
+}
+//# sourceMappingURL=isDate.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/observable/timer.js
+
+
+
+
+function timer(dueTime, intervalOrScheduler, scheduler) {
+    if (dueTime === void 0) { dueTime = 0; }
+    if (scheduler === void 0) { scheduler = async_async; }
+    var intervalDuration = -1;
+    if (intervalOrScheduler != null) {
+        if (isScheduler(intervalOrScheduler)) {
+            scheduler = intervalOrScheduler;
+        }
+        else {
+            intervalDuration = intervalOrScheduler;
+        }
+    }
+    return new Observable(function (subscriber) {
+        var due = isValidDate(dueTime) ? +dueTime - scheduler.now() : dueTime;
+        if (due < 0) {
+            due = 0;
+        }
+        var n = 0;
+        return scheduler.schedule(function () {
+            if (!subscriber.closed) {
+                subscriber.next(n++);
+                if (0 <= intervalDuration) {
+                    this.schedule(undefined, intervalDuration);
+                }
+                else {
+                    subscriber.complete();
+                }
+            }
+        }, due);
+    });
+}
+//# sourceMappingURL=timer.js.map
+;// CONCATENATED MODULE: ./node_modules/rxjs/dist/esm5/internal/operators/throttleTime.js
+
+
+
+function throttleTime(duration, scheduler, config) {
+    if (scheduler === void 0) { scheduler = asyncScheduler; }
+    if (config === void 0) { config = defaultThrottleConfig; }
+    var duration$ = timer(duration, scheduler);
+    return throttle(function () { return duration$; }, config);
+}
+//# sourceMappingURL=throttleTime.js.map
 // EXTERNAL MODULE: ./node_modules/classnames/index.js
 var classnames = __webpack_require__(4184);
 var classnames_default = /*#__PURE__*/__webpack_require__.n(classnames);
@@ -78808,630 +79486,6 @@ const Button_Button = /*#__PURE__*/react.forwardRef(({
 Button_Button.displayName = 'Button';
 Button_Button.defaultProps = Button_defaultProps;
 /* harmony default export */ const react_bootstrap_esm_Button = (Button_Button);
-// EXTERNAL MODULE: ./node_modules/prop-types/index.js
-var prop_types = __webpack_require__(5697);
-var prop_types_default = /*#__PURE__*/__webpack_require__.n(prop_types);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Feedback.js
-
-
-
-
-const propTypes = {
-  /**
-   * Specify whether the feedback is for valid or invalid fields
-   *
-   * @type {('valid'|'invalid')}
-   */
-  type: (prop_types_default()).string,
-
-  /** Display feedback as a tooltip. */
-  tooltip: (prop_types_default()).bool,
-  as: (prop_types_default()).elementType
-};
-const Feedback = /*#__PURE__*/react.forwardRef( // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-({
-  as: Component = 'div',
-  className,
-  type = 'valid',
-  tooltip = false,
-  ...props
-}, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
-  ref: ref,
-  className: classnames_default()(className, `${type}-${tooltip ? 'tooltip' : 'feedback'}`)
-}));
-Feedback.displayName = 'Feedback';
-Feedback.propTypes = propTypes;
-/* harmony default export */ const esm_Feedback = (Feedback);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormContext.js
- // TODO
-
-const FormContext = /*#__PURE__*/react.createContext({});
-/* harmony default export */ const esm_FormContext = (FormContext);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormCheckInput.js
-
-
-
-
-
-
-const FormCheckInput = /*#__PURE__*/react.forwardRef(({
-  id,
-  bsPrefix,
-  className,
-  type = 'checkbox',
-  isValid = false,
-  isInvalid = false,
-  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-  as: Component = 'input',
-  ...props
-}, ref) => {
-  const {
-    controlId
-  } = (0,react.useContext)(esm_FormContext);
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-check-input');
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
-    ref: ref,
-    type: type,
-    id: id || controlId,
-    className: classnames_default()(className, bsPrefix, isValid && 'is-valid', isInvalid && 'is-invalid')
-  });
-});
-FormCheckInput.displayName = 'FormCheckInput';
-/* harmony default export */ const esm_FormCheckInput = (FormCheckInput);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormCheckLabel.js
-
-
-
-
-
-
-const FormCheckLabel = /*#__PURE__*/react.forwardRef(({
-  bsPrefix,
-  className,
-  htmlFor,
-  ...props
-}, ref) => {
-  const {
-    controlId
-  } = (0,react.useContext)(esm_FormContext);
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-check-label');
-  return /*#__PURE__*/(0,jsx_runtime.jsx)("label", { ...props,
-    ref: ref,
-    htmlFor: htmlFor || controlId,
-    className: classnames_default()(className, bsPrefix)
-  });
-});
-FormCheckLabel.displayName = 'FormCheckLabel';
-/* harmony default export */ const esm_FormCheckLabel = (FormCheckLabel);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/ElementChildren.js
-
-/**
- * Iterates through children that are typically specified as `props.children`,
- * but only maps over children that are "valid elements".
- *
- * The mapFunction provided index will be normalised to the components mapped,
- * so an invalid component would not increase the index.
- *
- */
-
-function map(children, func) {
-  let index = 0;
-  return React.Children.map(children, child => /*#__PURE__*/React.isValidElement(child) ? func(child, index++) : child);
-}
-/**
- * Iterates through children that are "valid elements".
- *
- * The provided forEachFunc(child, index) will be called for each
- * leaf child with the index reflecting the position relative to "valid components".
- */
-
-
-function forEach(children, func) {
-  let index = 0;
-  React.Children.forEach(children, child => {
-    if ( /*#__PURE__*/React.isValidElement(child)) func(child, index++);
-  });
-}
-/**
- * Finds whether a component's `children` prop includes a React element of the
- * specified type.
- */
-
-
-function hasChildOfType(children, type) {
-  return react.Children.toArray(children).some(child => /*#__PURE__*/react.isValidElement(child) && child.type === type);
-}
-
-
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormCheck.js
-
-
-
-
-
-
-
-
-
-
-
-
-const FormCheck = /*#__PURE__*/react.forwardRef(({
-  id,
-  bsPrefix,
-  bsSwitchPrefix,
-  inline = false,
-  disabled = false,
-  isValid = false,
-  isInvalid = false,
-  feedbackTooltip = false,
-  feedback,
-  feedbackType,
-  className,
-  style,
-  title = '',
-  type = 'checkbox',
-  label,
-  children,
-  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-  as = 'input',
-  ...props
-}, ref) => {
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-check');
-  bsSwitchPrefix = useBootstrapPrefix(bsSwitchPrefix, 'form-switch');
-  const {
-    controlId
-  } = (0,react.useContext)(esm_FormContext);
-  const innerFormContext = (0,react.useMemo)(() => ({
-    controlId: id || controlId
-  }), [controlId, id]);
-  const hasLabel = !children && label != null && label !== false || hasChildOfType(children, esm_FormCheckLabel);
-
-  const input = /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormCheckInput, { ...props,
-    type: type === 'switch' ? 'checkbox' : type,
-    ref: ref,
-    isValid: isValid,
-    isInvalid: isInvalid,
-    disabled: disabled,
-    as: as
-  });
-
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormContext.Provider, {
-    value: innerFormContext,
-    children: /*#__PURE__*/(0,jsx_runtime.jsx)("div", {
-      style: style,
-      className: classnames_default()(className, hasLabel && bsPrefix, inline && `${bsPrefix}-inline`, type === 'switch' && bsSwitchPrefix),
-      children: children || /*#__PURE__*/(0,jsx_runtime.jsxs)(jsx_runtime.Fragment, {
-        children: [input, hasLabel && /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormCheckLabel, {
-          title: title,
-          children: label
-        }), feedback && /*#__PURE__*/(0,jsx_runtime.jsx)(esm_Feedback, {
-          type: feedbackType,
-          tooltip: feedbackTooltip,
-          children: feedback
-        })]
-      })
-    })
-  });
-});
-FormCheck.displayName = 'FormCheck';
-/* harmony default export */ const esm_FormCheck = (Object.assign(FormCheck, {
-  Input: esm_FormCheckInput,
-  Label: esm_FormCheckLabel
-}));
-// EXTERNAL MODULE: ./node_modules/warning/warning.js
-var warning = __webpack_require__(2473);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormControl.js
-
-
-
-
-
-
-
-
-const FormControl = /*#__PURE__*/react.forwardRef(({
-  bsPrefix,
-  type,
-  size,
-  htmlSize,
-  id,
-  className,
-  isValid = false,
-  isInvalid = false,
-  plaintext,
-  readOnly,
-  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-  as: Component = 'input',
-  ...props
-}, ref) => {
-  const {
-    controlId
-  } = (0,react.useContext)(esm_FormContext);
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-control');
-  let classes;
-
-  if (plaintext) {
-    classes = {
-      [`${bsPrefix}-plaintext`]: true
-    };
-  } else {
-    classes = {
-      [bsPrefix]: true,
-      [`${bsPrefix}-${size}`]: size
-    };
-  }
-
-   false ? 0 : void 0;
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
-    type: type,
-    size: htmlSize,
-    ref: ref,
-    readOnly: readOnly,
-    id: id || controlId,
-    className: classnames_default()(className, classes, isValid && `is-valid`, isInvalid && `is-invalid`, type === 'color' && `${bsPrefix}-color`)
-  });
-});
-FormControl.displayName = 'FormControl';
-/* harmony default export */ const esm_FormControl = (Object.assign(FormControl, {
-  Feedback: esm_Feedback
-}));
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/camelize.js
-var rHyphen = /-(.)/g;
-function camelize(string) {
-  return string.replace(rHyphen, function (_, chr) {
-    return chr.toUpperCase();
-  });
-}
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/createWithBsPrefix.js
-
-
-
-
-
-
-const pascalCase = str => str[0].toUpperCase() + camelize(str).slice(1);
-
-// TODO: emstricten & fix the typing here! `createWithBsPrefix<TElementType>...`
-function createWithBsPrefix(prefix, {
-  displayName = pascalCase(prefix),
-  Component,
-  defaultProps
-} = {}) {
-  const BsComponent = /*#__PURE__*/react.forwardRef(({
-    className,
-    bsPrefix,
-    as: Tag = Component || 'div',
-    ...props
-  }, ref) => {
-    const resolvedPrefix = useBootstrapPrefix(bsPrefix, prefix);
-    return /*#__PURE__*/(0,jsx_runtime.jsx)(Tag, {
-      ref: ref,
-      className: classnames_default()(className, resolvedPrefix),
-      ...props
-    });
-  });
-  BsComponent.defaultProps = defaultProps;
-  BsComponent.displayName = displayName;
-  return BsComponent;
-}
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormFloating.js
-
-/* harmony default export */ const FormFloating = (createWithBsPrefix('form-floating'));
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormGroup.js
-
-
-
-
-const FormGroup = /*#__PURE__*/react.forwardRef(({
-  controlId,
-  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-  as: Component = 'div',
-  ...props
-}, ref) => {
-  const context = (0,react.useMemo)(() => ({
-    controlId
-  }), [controlId]);
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormContext.Provider, {
-    value: context,
-    children: /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
-      ref: ref
-    })
-  });
-});
-FormGroup.displayName = 'FormGroup';
-/* harmony default export */ const esm_FormGroup = (FormGroup);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Col.js
-
-
-
-
-function useCol({
-  as,
-  bsPrefix,
-  className,
-  ...props
-}) {
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'col');
-  const breakpoints = useBootstrapBreakpoints();
-  const spans = [];
-  const classes = [];
-  breakpoints.forEach(brkPoint => {
-    const propValue = props[brkPoint];
-    delete props[brkPoint];
-    let span;
-    let offset;
-    let order;
-
-    if (typeof propValue === 'object' && propValue != null) {
-      ({
-        span,
-        offset,
-        order
-      } = propValue);
-    } else {
-      span = propValue;
-    }
-
-    const infix = brkPoint !== 'xs' ? `-${brkPoint}` : '';
-    if (span) spans.push(span === true ? `${bsPrefix}${infix}` : `${bsPrefix}${infix}-${span}`);
-    if (order != null) classes.push(`order${infix}-${order}`);
-    if (offset != null) classes.push(`offset${infix}-${offset}`);
-  });
-  return [{ ...props,
-    className: classnames_default()(className, ...spans, ...classes)
-  }, {
-    as,
-    bsPrefix,
-    spans
-  }];
-}
-const Col = /*#__PURE__*/react.forwardRef( // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-(props, ref) => {
-  const [{
-    className,
-    ...colProps
-  }, {
-    as: Component = 'div',
-    bsPrefix,
-    spans
-  }] = useCol(props);
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...colProps,
-    ref: ref,
-    className: classnames_default()(className, !spans.length && bsPrefix)
-  });
-});
-Col.displayName = 'Col';
-/* harmony default export */ const esm_Col = (Col);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormLabel.js
-
-
-
-
-
-
-
-
-const FormLabel_defaultProps = {
-  column: false,
-  visuallyHidden: false
-};
-const FormLabel = /*#__PURE__*/react.forwardRef(({
-  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-  as: Component = 'label',
-  bsPrefix,
-  column,
-  visuallyHidden,
-  className,
-  htmlFor,
-  ...props
-}, ref) => {
-  const {
-    controlId
-  } = (0,react.useContext)(esm_FormContext);
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-label');
-  let columnClass = 'col-form-label';
-  if (typeof column === 'string') columnClass = `${columnClass} ${columnClass}-${column}`;
-  const classes = classnames_default()(className, bsPrefix, visuallyHidden && 'visually-hidden', column && columnClass);
-   false ? 0 : void 0;
-  htmlFor = htmlFor || controlId;
-  if (column) return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_Col, {
-    ref: ref,
-    as: "label",
-    className: classes,
-    htmlFor: htmlFor,
-    ...props
-  });
-  return (
-    /*#__PURE__*/
-    // eslint-disable-next-line jsx-a11y/label-has-for, jsx-a11y/label-has-associated-control
-    (0,jsx_runtime.jsx)(Component, {
-      ref: ref,
-      className: classes,
-      htmlFor: htmlFor,
-      ...props
-    })
-  );
-});
-FormLabel.displayName = 'FormLabel';
-FormLabel.defaultProps = FormLabel_defaultProps;
-/* harmony default export */ const esm_FormLabel = (FormLabel);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormRange.js
-
-
-
-
-
-
-const FormRange = /*#__PURE__*/react.forwardRef(({
-  bsPrefix,
-  className,
-  id,
-  ...props
-}, ref) => {
-  const {
-    controlId
-  } = (0,react.useContext)(esm_FormContext);
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-range');
-  return /*#__PURE__*/(0,jsx_runtime.jsx)("input", { ...props,
-    type: "range",
-    ref: ref,
-    className: classnames_default()(className, bsPrefix),
-    id: id || controlId
-  });
-});
-FormRange.displayName = 'FormRange';
-/* harmony default export */ const esm_FormRange = (FormRange);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormSelect.js
-
-
-
-
-
-
-const FormSelect = /*#__PURE__*/react.forwardRef(({
-  bsPrefix,
-  size,
-  htmlSize,
-  className,
-  isValid = false,
-  isInvalid = false,
-  id,
-  ...props
-}, ref) => {
-  const {
-    controlId
-  } = (0,react.useContext)(esm_FormContext);
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-select');
-  return /*#__PURE__*/(0,jsx_runtime.jsx)("select", { ...props,
-    size: htmlSize,
-    ref: ref,
-    className: classnames_default()(className, bsPrefix, size && `${bsPrefix}-${size}`, isValid && `is-valid`, isInvalid && `is-invalid`),
-    id: id || controlId
-  });
-});
-FormSelect.displayName = 'FormSelect';
-/* harmony default export */ const esm_FormSelect = (FormSelect);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormText.js
-
-
-
-
-const FormText = /*#__PURE__*/react.forwardRef( // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-({
-  bsPrefix,
-  className,
-  as: Component = 'small',
-  muted,
-  ...props
-}, ref) => {
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-text');
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
-    ref: ref,
-    className: classnames_default()(className, bsPrefix, muted && 'text-muted')
-  });
-});
-FormText.displayName = 'FormText';
-/* harmony default export */ const esm_FormText = (FormText);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Switch.js
-
-
-
-const Switch = /*#__PURE__*/react.forwardRef((props, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormCheck, { ...props,
-  ref: ref,
-  type: "switch"
-}));
-Switch.displayName = 'Switch';
-/* harmony default export */ const esm_Switch = (Object.assign(Switch, {
-  Input: esm_FormCheck.Input,
-  Label: esm_FormCheck.Label
-}));
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FloatingLabel.js
-
-
-
-
-
-
-const FloatingLabel = /*#__PURE__*/react.forwardRef(({
-  bsPrefix,
-  className,
-  children,
-  controlId,
-  label,
-  ...props
-}, ref) => {
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-floating');
-  return /*#__PURE__*/(0,jsx_runtime.jsxs)(esm_FormGroup, {
-    ref: ref,
-    className: classnames_default()(className, bsPrefix),
-    controlId: controlId,
-    ...props,
-    children: [children, /*#__PURE__*/(0,jsx_runtime.jsx)("label", {
-      htmlFor: controlId,
-      children: label
-    })]
-  });
-});
-FloatingLabel.displayName = 'FloatingLabel';
-/* harmony default export */ const esm_FloatingLabel = (FloatingLabel);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Form.js
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const Form_propTypes = {
-  /**
-   * The Form `ref` will be forwarded to the underlying element,
-   * which means, unless it's rendered `as` a composite component,
-   * it will be a DOM node, when resolved.
-   *
-   * @type {ReactRef}
-   * @alias ref
-   */
-  _ref: (prop_types_default()).any,
-
-  /**
-   * Mark a form as having been validated. Setting it to `true` will
-   * toggle any validation styles on the forms elements.
-   */
-  validated: (prop_types_default()).bool,
-  as: (prop_types_default()).elementType
-};
-const Form = /*#__PURE__*/react.forwardRef(({
-  className,
-  validated,
-  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-  as: Component = 'form',
-  ...props
-}, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
-  ref: ref,
-  className: classnames_default()(className, validated && 'was-validated')
-}));
-Form.displayName = 'Form';
-Form.propTypes = Form_propTypes;
-/* harmony default export */ const esm_Form = (Object.assign(Form, {
-  Group: esm_FormGroup,
-  Control: esm_FormControl,
-  Floating: FormFloating,
-  Check: esm_FormCheck,
-  Switch: esm_Switch,
-  Label: esm_FormLabel,
-  Text: esm_FormText,
-  Range: esm_FormRange,
-  Select: esm_FormSelect,
-  FloatingLabel: esm_FloatingLabel
-}));
 ;// CONCATENATED MODULE: ./node_modules/@babel/runtime/helpers/esm/extends.js
 function extends_extends() {
   extends_extends = Object.assign ? Object.assign.bind() : function (target) {
@@ -79908,114 +79962,6 @@ function uncontrollable(Component, controlledValues, methods) {
 ;// CONCATENATED MODULE: ./node_modules/uncontrollable/lib/esm/index.js
 
 
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/querySelectorAll.js
-var toArray = Function.prototype.bind.call(Function.prototype.call, [].slice);
-/**
- * Runs `querySelectorAll` on a given element.
- * 
- * @param element the element
- * @param selector the selector
- */
-
-function qsa(element, selector) {
-  return toArray(element.querySelectorAll(selector));
-}
-;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useForceUpdate.js
-
-/**
- * Returns a function that triggers a component update. the hook equivalent to
- * `this.forceUpdate()` in a class component. In most cases using a state value directly
- * is preferable but may be required in some advanced usages of refs for interop or
- * when direct DOM manipulation is required.
- *
- * ```ts
- * const forceUpdate = useForceUpdate();
- *
- * const updateOnClick = useCallback(() => {
- *  forceUpdate()
- * }, [forceUpdate])
- *
- * return <button type="button" onClick={updateOnClick}>Hi there</button>
- * ```
- */
-
-function useForceUpdate() {
-  // The toggling state value is designed to defeat React optimizations for skipping
-  // updates when they are stricting equal to the last state value
-  var _useReducer = (0,react.useReducer)(function (state) {
-    return !state;
-  }, false),
-      dispatch = _useReducer[1];
-
-  return dispatch;
-}
-;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useMergedRefs.js
-
-
-var toFnRef = function toFnRef(ref) {
-  return !ref || typeof ref === 'function' ? ref : function (value) {
-    ref.current = value;
-  };
-};
-
-function mergeRefs(refA, refB) {
-  var a = toFnRef(refA);
-  var b = toFnRef(refB);
-  return function (value) {
-    if (a) a(value);
-    if (b) b(value);
-  };
-}
-/**
- * Create and returns a single callback ref composed from two other Refs.
- *
- * ```tsx
- * const Button = React.forwardRef((props, ref) => {
- *   const [element, attachRef] = useCallbackRef<HTMLButtonElement>();
- *   const mergedRef = useMergedRefs(ref, attachRef);
- *
- *   return <button ref={mergedRef} {...props}/>
- * })
- * ```
- *
- * @param refA A Callback or mutable Ref
- * @param refB A Callback or mutable Ref
- * @category refs
- */
-
-function useMergedRefs(refA, refB) {
-  return (0,react.useMemo)(function () {
-    return mergeRefs(refA, refB);
-  }, [refA, refB]);
-}
-
-/* harmony default export */ const esm_useMergedRefs = (useMergedRefs);
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/NavContext.js
-
-const NavContext = /*#__PURE__*/react.createContext(null);
-NavContext.displayName = 'NavContext';
-/* harmony default export */ const esm_NavContext = (NavContext);
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/SelectableContext.js
-
-const SelectableContext = /*#__PURE__*/react.createContext(null);
-const makeEventKey = (eventKey, href = null) => {
-  if (eventKey != null) return String(eventKey);
-  return href || null;
-};
-/* harmony default export */ const esm_SelectableContext = (SelectableContext);
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/TabContext.js
-
-const TabContext = /*#__PURE__*/react.createContext(null);
-/* harmony default export */ const esm_TabContext = (TabContext);
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/DataKey.js
-const ATTRIBUTE_PREFIX = `data-rr-ui-`;
-const PROPERTY_PREFIX = `rrUi`;
-function dataAttr(property) {
-  return `${ATTRIBUTE_PREFIX}${property}`;
-}
-function dataProp(property) {
-  return `${PROPERTY_PREFIX}${property}`;
-}
 ;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useCommittedRef.js
 
 /**
@@ -80028,7 +79974,7 @@ function dataProp(property) {
  * @param value The `Ref` value
  */
 
-function useCommittedRef(value) {
+function useCommittedRef_useCommittedRef(value) {
   var ref = (0,react.useRef)(value);
   (0,react.useEffect)(function () {
     ref.current = value;
@@ -80036,447 +79982,15 @@ function useCommittedRef(value) {
   return ref;
 }
 
-/* harmony default export */ const esm_useCommittedRef = (useCommittedRef);
+/* harmony default export */ const esm_useCommittedRef = (useCommittedRef_useCommittedRef);
 ;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useEventCallback.js
 
 
-function useEventCallback(fn) {
+function useEventCallback_useEventCallback(fn) {
   var ref = esm_useCommittedRef(fn);
   return (0,react.useCallback)(function () {
     return ref.current && ref.current.apply(ref, arguments);
   }, [ref]);
-}
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/NavItem.js
-const NavItem_excluded = ["as", "active", "eventKey"];
-
-function NavItem_objectWithoutPropertiesLoose(source, excluded) { if (source == null) return {}; var target = {}; var sourceKeys = Object.keys(source); var key, i; for (i = 0; i < sourceKeys.length; i++) { key = sourceKeys[i]; if (excluded.indexOf(key) >= 0) continue; target[key] = source[key]; } return target; }
-
-
-
-
-
-
-
-
-
-
-function useNavItem({
-  key,
-  onClick,
-  active,
-  id,
-  role,
-  disabled
-}) {
-  const parentOnSelect = (0,react.useContext)(esm_SelectableContext);
-  const navContext = (0,react.useContext)(esm_NavContext);
-  const tabContext = (0,react.useContext)(esm_TabContext);
-  let isActive = active;
-  const props = {
-    role
-  };
-
-  if (navContext) {
-    if (!role && navContext.role === 'tablist') props.role = 'tab';
-    const contextControllerId = navContext.getControllerId(key != null ? key : null);
-    const contextControlledId = navContext.getControlledId(key != null ? key : null); // @ts-ignore
-
-    props[dataAttr('event-key')] = key;
-    props.id = contextControllerId || id;
-    isActive = active == null && key != null ? navContext.activeKey === key : active;
-    /**
-     * Simplified scenario for `mountOnEnter`.
-     *
-     * While it would make sense to keep 'aria-controls' for tabs that have been mounted at least
-     * once, it would also complicate the code quite a bit, for very little gain.
-     * The following implementation is probably good enough.
-     *
-     * @see https://github.com/react-restart/ui/pull/40#issuecomment-1009971561
-     */
-
-    if (isActive || !(tabContext != null && tabContext.unmountOnExit) && !(tabContext != null && tabContext.mountOnEnter)) props['aria-controls'] = contextControlledId;
-  }
-
-  if (props.role === 'tab') {
-    props['aria-selected'] = isActive;
-
-    if (!isActive) {
-      props.tabIndex = -1;
-    }
-
-    if (disabled) {
-      props.tabIndex = -1;
-      props['aria-disabled'] = true;
-    }
-  }
-
-  props.onClick = useEventCallback(e => {
-    if (disabled) return;
-    onClick == null ? void 0 : onClick(e);
-
-    if (key == null) {
-      return;
-    }
-
-    if (parentOnSelect && !e.isPropagationStopped()) {
-      parentOnSelect(key, e);
-    }
-  });
-  return [props, {
-    isActive
-  }];
-}
-const NavItem = /*#__PURE__*/react.forwardRef((_ref, ref) => {
-  let {
-    as: Component = esm_Button,
-    active,
-    eventKey
-  } = _ref,
-      options = NavItem_objectWithoutPropertiesLoose(_ref, NavItem_excluded);
-
-  const [props, meta] = useNavItem(Object.assign({
-    key: makeEventKey(eventKey, options.href),
-    active
-  }, options)); // @ts-ignore
-
-  props[dataAttr('active')] = meta.isActive;
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, Object.assign({}, options, props, {
-    ref: ref
-  }));
-});
-NavItem.displayName = 'NavItem';
-/* harmony default export */ const esm_NavItem = (NavItem);
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/Nav.js
-const Nav_excluded = ["as", "onSelect", "activeKey", "role", "onKeyDown"];
-
-function Nav_objectWithoutPropertiesLoose(source, excluded) { if (source == null) return {}; var target = {}; var sourceKeys = Object.keys(source); var key, i; for (i = 0; i < sourceKeys.length; i++) { key = sourceKeys[i]; if (excluded.indexOf(key) >= 0) continue; target[key] = source[key]; } return target; }
-
-
-
-
-
-
-
-
-
-
-
-
-
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-const Nav_noop = () => {};
-
-const EVENT_KEY_ATTR = dataAttr('event-key');
-const Nav = /*#__PURE__*/react.forwardRef((_ref, ref) => {
-  let {
-    // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-    as: Component = 'div',
-    onSelect,
-    activeKey,
-    role,
-    onKeyDown
-  } = _ref,
-      props = Nav_objectWithoutPropertiesLoose(_ref, Nav_excluded);
-
-  // A ref and forceUpdate for refocus, b/c we only want to trigger when needed
-  // and don't want to reset the set in the effect
-  const forceUpdate = useForceUpdate();
-  const needsRefocusRef = (0,react.useRef)(false);
-  const parentOnSelect = (0,react.useContext)(esm_SelectableContext);
-  const tabContext = (0,react.useContext)(esm_TabContext);
-  let getControlledId, getControllerId;
-
-  if (tabContext) {
-    role = role || 'tablist';
-    activeKey = tabContext.activeKey; // TODO: do we need to duplicate these?
-
-    getControlledId = tabContext.getControlledId;
-    getControllerId = tabContext.getControllerId;
-  }
-
-  const listNode = (0,react.useRef)(null);
-
-  const getNextActiveTab = offset => {
-    const currentListNode = listNode.current;
-    if (!currentListNode) return null;
-    const items = qsa(currentListNode, `[${EVENT_KEY_ATTR}]:not([aria-disabled=true])`);
-    const activeChild = currentListNode.querySelector('[aria-selected=true]');
-    if (!activeChild || activeChild !== document.activeElement) return null;
-    const index = items.indexOf(activeChild);
-    if (index === -1) return null;
-    let nextIndex = index + offset;
-    if (nextIndex >= items.length) nextIndex = 0;
-    if (nextIndex < 0) nextIndex = items.length - 1;
-    return items[nextIndex];
-  };
-
-  const handleSelect = (key, event) => {
-    if (key == null) return;
-    onSelect == null ? void 0 : onSelect(key, event);
-    parentOnSelect == null ? void 0 : parentOnSelect(key, event);
-  };
-
-  const handleKeyDown = event => {
-    onKeyDown == null ? void 0 : onKeyDown(event);
-
-    if (!tabContext) {
-      return;
-    }
-
-    let nextActiveChild;
-
-    switch (event.key) {
-      case 'ArrowLeft':
-      case 'ArrowUp':
-        nextActiveChild = getNextActiveTab(-1);
-        break;
-
-      case 'ArrowRight':
-      case 'ArrowDown':
-        nextActiveChild = getNextActiveTab(1);
-        break;
-
-      default:
-        return;
-    }
-
-    if (!nextActiveChild) return;
-    event.preventDefault();
-    handleSelect(nextActiveChild.dataset[dataProp('EventKey')] || null, event);
-    needsRefocusRef.current = true;
-    forceUpdate();
-  };
-
-  (0,react.useEffect)(() => {
-    if (listNode.current && needsRefocusRef.current) {
-      const activeChild = listNode.current.querySelector(`[${EVENT_KEY_ATTR}][aria-selected=true]`);
-      activeChild == null ? void 0 : activeChild.focus();
-    }
-
-    needsRefocusRef.current = false;
-  });
-  const mergedRef = esm_useMergedRefs(ref, listNode);
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_SelectableContext.Provider, {
-    value: handleSelect,
-    children: /*#__PURE__*/(0,jsx_runtime.jsx)(esm_NavContext.Provider, {
-      value: {
-        role,
-        // used by NavLink to determine it's role
-        activeKey: makeEventKey(activeKey),
-        getControlledId: getControlledId || Nav_noop,
-        getControllerId: getControllerId || Nav_noop
-      },
-      children: /*#__PURE__*/(0,jsx_runtime.jsx)(Component, Object.assign({}, props, {
-        onKeyDown: handleKeyDown,
-        ref: mergedRef,
-        role: role
-      }))
-    })
-  });
-});
-Nav.displayName = 'Nav';
-/* harmony default export */ const esm_Nav = (Object.assign(Nav, {
-  Item: esm_NavItem
-}));
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/ListGroupItem.js
-
-
-
-
-
-
-
-const ListGroupItem = /*#__PURE__*/react.forwardRef(({
-  bsPrefix,
-  active,
-  disabled,
-  eventKey,
-  className,
-  variant,
-  action,
-  as,
-  ...props
-}, ref) => {
-  bsPrefix = useBootstrapPrefix(bsPrefix, 'list-group-item');
-  const [navItemProps, meta] = useNavItem({
-    key: makeEventKey(eventKey, props.href),
-    active,
-    ...props
-  });
-  const handleClick = useEventCallback(event => {
-    if (disabled) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-
-    navItemProps.onClick(event);
-  });
-
-  if (disabled && props.tabIndex === undefined) {
-    props.tabIndex = -1;
-    props['aria-disabled'] = true;
-  } // eslint-disable-next-line no-nested-ternary
-
-
-  const Component = as || (action ? props.href ? 'a' : 'button' : 'div');
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, {
-    ref: ref,
-    ...props,
-    ...navItemProps,
-    onClick: handleClick,
-    className: classnames_default()(className, bsPrefix, meta.isActive && 'active', disabled && 'disabled', variant && `${bsPrefix}-${variant}`, action && `${bsPrefix}-action`)
-  });
-});
-ListGroupItem.displayName = 'ListGroupItem';
-/* harmony default export */ const esm_ListGroupItem = (ListGroupItem);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/ListGroup.js
-
-
-
-
-
-
-
-
-const ListGroup = /*#__PURE__*/react.forwardRef((props, ref) => {
-  const {
-    className,
-    bsPrefix: initialBsPrefix,
-    variant,
-    horizontal,
-    numbered,
-    // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
-    as = 'div',
-    ...controlledProps
-  } = useUncontrolled(props, {
-    activeKey: 'onSelect'
-  });
-  const bsPrefix = useBootstrapPrefix(initialBsPrefix, 'list-group');
-  let horizontalVariant;
-
-  if (horizontal) {
-    horizontalVariant = horizontal === true ? 'horizontal' : `horizontal-${horizontal}`;
-  }
-
-   false ? 0 : void 0;
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_Nav, {
-    ref: ref,
-    ...controlledProps,
-    as: as,
-    className: classnames_default()(className, bsPrefix, variant && `${bsPrefix}-${variant}`, horizontalVariant && `${bsPrefix}-${horizontalVariant}`, numbered && `${bsPrefix}-numbered`)
-  });
-});
-ListGroup.displayName = 'ListGroup';
-/* harmony default export */ const esm_ListGroup = (Object.assign(ListGroup, {
-  Item: esm_ListGroupItem
-}));
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/canUseDOM.js
-/* harmony default export */ const canUseDOM = (!!(typeof window !== 'undefined' && window.document && window.document.createElement));
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/addEventListener.js
-/* eslint-disable no-return-assign */
-
-var optionsSupported = false;
-var onceSupported = false;
-
-try {
-  var options = {
-    get passive() {
-      return optionsSupported = true;
-    },
-
-    get once() {
-      // eslint-disable-next-line no-multi-assign
-      return onceSupported = optionsSupported = true;
-    }
-
-  };
-
-  if (canUseDOM) {
-    window.addEventListener('test', options, options);
-    window.removeEventListener('test', options, true);
-  }
-} catch (e) {
-  /* */
-}
-
-/**
- * An `addEventListener` ponyfill, supports the `once` option
- * 
- * @param node the element
- * @param eventName the event name
- * @param handle the handler
- * @param options event options
- */
-function addEventListener(node, eventName, handler, options) {
-  if (options && typeof options !== 'boolean' && !onceSupported) {
-    var once = options.once,
-        capture = options.capture;
-    var wrappedHandler = handler;
-
-    if (!onceSupported && once) {
-      wrappedHandler = handler.__once || function onceHandler(event) {
-        this.removeEventListener(eventName, onceHandler, capture);
-        handler.call(this, event);
-      };
-
-      handler.__once = wrappedHandler;
-    }
-
-    node.addEventListener(eventName, wrappedHandler, optionsSupported ? options : capture);
-  }
-
-  node.addEventListener(eventName, handler, options);
-}
-
-/* harmony default export */ const esm_addEventListener = (addEventListener);
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/ownerDocument.js
-/**
- * Returns the owner document of a given element.
- * 
- * @param node the element
- */
-function ownerDocument(node) {
-  return node && node.ownerDocument || document;
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/removeEventListener.js
-/**
- * A `removeEventListener` ponyfill
- * 
- * @param node the element
- * @param eventName the event name
- * @param handle the handler
- * @param options event options
- */
-function removeEventListener(node, eventName, handler, options) {
-  var capture = options && typeof options !== 'boolean' ? options.capture : options;
-  node.removeEventListener(eventName, handler, capture);
-
-  if (handler.__once) {
-    node.removeEventListener(eventName, handler.__once, capture);
-  }
-}
-
-/* harmony default export */ const esm_removeEventListener = (removeEventListener);
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/scrollbarSize.js
-
-var size;
-function scrollbarSize(recalc) {
-  if (!size && size !== 0 || recalc) {
-    if (canUseDOM) {
-      var scrollDiv = document.createElement('div');
-      scrollDiv.style.position = 'absolute';
-      scrollDiv.style.top = '-9999px';
-      scrollDiv.style.width = '50px';
-      scrollDiv.style.height = '50px';
-      scrollDiv.style.overflow = 'scroll';
-      document.body.appendChild(scrollDiv);
-      size = scrollDiv.offsetWidth - scrollDiv.clientWidth;
-      document.body.removeChild(scrollDiv);
-    }
-  }
-
-  return size;
 }
 ;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useCallbackRef.js
 
@@ -80508,232 +80022,210 @@ function scrollbarSize(recalc) {
 function useCallbackRef() {
   return (0,react.useState)(null);
 }
-;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useUpdatedRef.js
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useEventListener.js
 
-/**
- * Returns a ref that is immediately updated with the new value
- *
- * @param value The Ref value
- * @category refs
- */
-
-function useUpdatedRef(value) {
-  var valueRef = (0,react.useRef)(value);
-  valueRef.current = value;
-  return valueRef;
-}
-;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useWillUnmount.js
 
 
 /**
- * Attach a callback that fires when a component unmounts
+ * Attaches an event handler outside directly to specified DOM element
+ * bypassing the react synthetic event system.
  *
- * @param fn Handler to run when the component unmounts
- * @category effects
+ * @param element The target to listen for events on
+ * @param event The DOM event name
+ * @param handler An event handler
+ * @param capture Whether or not to listen during the capture event phase
  */
+function useEventListener_useEventListener(eventTarget, event, listener, capture) {
+  if (capture === void 0) {
+    capture = false;
+  }
 
-function useWillUnmount(fn) {
-  var onUnmount = useUpdatedRef(fn);
-  (0,react.useEffect)(function () {
+  var handler = useEventCallback(listener);
+  useEffect(function () {
+    var target = typeof eventTarget === 'function' ? eventTarget() : eventTarget;
+    target.addEventListener(event, handler, capture);
     return function () {
-      return onUnmount.current();
+      return target.removeEventListener(event, handler, capture);
+    };
+  }, [eventTarget]);
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useGlobalListener.js
+
+
+
+/**
+ * Attaches an event handler outside directly to the `document`,
+ * bypassing the react synthetic event system.
+ *
+ * ```ts
+ * useGlobalListener('keydown', (event) => {
+ *  console.log(event.key)
+ * })
+ * ```
+ *
+ * @param event The DOM event name
+ * @param handler An event handler
+ * @param capture Whether or not to listen during the capture event phase
+ */
+function useGlobalListener(event, handler, capture) {
+  if (capture === void 0) {
+    capture = false;
+  }
+
+  var documentTarget = useCallback(function () {
+    return document;
+  }, []);
+  return useEventListener(documentTarget, event, handler, capture);
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useInterval.js
+
+
+/**
+ * Creates a `setInterval` that is properly cleaned up when a component unmounted
+ *
+ * ```tsx
+ *  function Timer() {
+ *    const [timer, setTimer] = useState(0)
+ *    useInterval(() => setTimer(i => i + 1), 1000)
+ *
+ *    return <span>{timer} seconds past</span>
+ *  }
+ * ```
+ *
+ * @param fn an function run on each interval
+ * @param ms The milliseconds duration of the interval
+ */
+
+function useInterval(fn, ms, paused, runImmediately) {
+  if (paused === void 0) {
+    paused = false;
+  }
+
+  if (runImmediately === void 0) {
+    runImmediately = false;
+  }
+
+  var handle;
+  var fnRef = useCommittedRef(fn); // this ref is necessary b/c useEffect will sometimes miss a paused toggle
+  // orphaning a setTimeout chain in the aether, so relying on it's refresh logic is not reliable.
+
+  var pausedRef = useCommittedRef(paused);
+
+  var tick = function tick() {
+    if (pausedRef.current) return;
+    fnRef.current();
+    schedule(); // eslint-disable-line no-use-before-define
+  };
+
+  var schedule = function schedule() {
+    clearTimeout(handle);
+    handle = setTimeout(tick, ms);
+  };
+
+  useEffect(function () {
+    if (runImmediately) {
+      tick();
+    } else {
+      schedule();
+    }
+
+    return function () {
+      return clearTimeout(handle);
+    };
+  }, [paused, runImmediately]);
+}
+
+/* harmony default export */ const esm_useInterval = ((/* unused pure expression or super */ null && (useInterval)));
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useRafInterval.js
+
+
+
+function useRafInterval(fn, ms, paused) {
+  if (paused === void 0) {
+    paused = false;
+  }
+
+  var handle;
+  var start = new Date().getTime();
+  var fnRef = useCommittedRef(fn); // this ref is necessary b/c useEffect will sometimes miss a paused toggle
+  // orphaning a setTimeout chain in the aether, so relying on it's refresh logic is not reliable.
+
+  var pausedRef = useCommittedRef(paused);
+
+  function loop() {
+    var current = new Date().getTime();
+    var delta = current - start;
+    if (pausedRef.current) return;
+
+    if (delta >= ms && fnRef.current) {
+      fnRef.current();
+      start = new Date().getTime();
+    }
+
+    cancelAnimationFrame(handle);
+    handle = requestAnimationFrame(loop);
+  }
+
+  useEffect(function () {
+    handle = requestAnimationFrame(loop);
+    return function () {
+      return cancelAnimationFrame(handle);
     };
   }, []);
 }
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/ownerWindow.js
+
+/* harmony default export */ const esm_useRafInterval = ((/* unused pure expression or super */ null && (useRafInterval)));
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useMergeState.js
+function useMergeState_extends() { useMergeState_extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; }; return useMergeState_extends.apply(this, arguments); }
+
+
 
 /**
- * Returns the owner window of a given element.
- * 
- * @param node the element
- */
-
-function ownerWindow(node) {
-  var doc = ownerDocument(node);
-  return doc && doc.defaultView || window;
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/getComputedStyle.js
-
-/**
- * Returns one or all computed style properties of an element.
- * 
- * @param node the element
- * @param psuedoElement the style property
- */
-
-function getComputedStyle(node, psuedoElement) {
-  return ownerWindow(node).getComputedStyle(node, psuedoElement);
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/hyphenate.js
-var rUpper = /([A-Z])/g;
-function hyphenate(string) {
-  return string.replace(rUpper, '-$1').toLowerCase();
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/hyphenateStyle.js
-/**
- * Copyright 2013-2014, Facebook, Inc.
- * All rights reserved.
- * https://github.com/facebook/react/blob/2aeb8a2a6beb00617a4217f7f8284924fa2ad819/src/vendor/core/hyphenateStyleName.js
- */
-
-var msPattern = /^ms-/;
-function hyphenateStyleName(string) {
-  return hyphenate(string).replace(msPattern, '-ms-');
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/isTransform.js
-var supportedTransforms = /^((translate|rotate|scale)(X|Y|Z|3d)?|matrix(3d)?|perspective|skew(X|Y)?)$/i;
-function isTransform(value) {
-  return !!(value && supportedTransforms.test(value));
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/css.js
-
-
-
-
-function style(node, property) {
-  var css = '';
-  var transforms = '';
-
-  if (typeof property === 'string') {
-    return node.style.getPropertyValue(hyphenateStyleName(property)) || getComputedStyle(node).getPropertyValue(hyphenateStyleName(property));
-  }
-
-  Object.keys(property).forEach(function (key) {
-    var value = property[key];
-
-    if (!value && value !== 0) {
-      node.style.removeProperty(hyphenateStyleName(key));
-    } else if (isTransform(key)) {
-      transforms += key + "(" + value + ") ";
-    } else {
-      css += hyphenateStyleName(key) + ": " + value + ";";
-    }
-  });
-
-  if (transforms) {
-    css += "transform: " + transforms + ";";
-  }
-
-  node.style.cssText += ";" + css;
-}
-
-/* harmony default export */ const css = (style);
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/listen.js
-
-
-
-function listen(node, eventName, handler, options) {
-  esm_addEventListener(node, eventName, handler, options);
-  return function () {
-    esm_removeEventListener(node, eventName, handler, options);
-  };
-}
-
-/* harmony default export */ const esm_listen = (listen);
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/triggerEvent.js
-/**
- * Triggers an event on a given element.
- * 
- * @param node the element
- * @param eventName the event name to trigger
- * @param bubbles whether the event should bubble up
- * @param cancelable whether the event should be cancelable
- */
-function triggerEvent(node, eventName, bubbles, cancelable) {
-  if (bubbles === void 0) {
-    bubbles = false;
-  }
-
-  if (cancelable === void 0) {
-    cancelable = true;
-  }
-
-  if (node) {
-    var event = document.createEvent('HTMLEvents');
-    event.initEvent(eventName, bubbles, cancelable);
-    node.dispatchEvent(event);
-  }
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/transitionEnd.js
-
-
-
-
-function parseDuration(node) {
-  var str = css(node, 'transitionDuration') || '';
-  var mult = str.indexOf('ms') === -1 ? 1000 : 1;
-  return parseFloat(str) * mult;
-}
-
-function emulateTransitionEnd(element, duration, padding) {
-  if (padding === void 0) {
-    padding = 5;
-  }
-
-  var called = false;
-  var handle = setTimeout(function () {
-    if (!called) triggerEvent(element, 'transitionend', true);
-  }, duration + padding);
-  var remove = esm_listen(element, 'transitionend', function () {
-    called = true;
-  }, {
-    once: true
-  });
-  return function () {
-    clearTimeout(handle);
-    remove();
-  };
-}
-
-function transitionEnd(element, handler, duration, padding) {
-  if (duration == null) duration = parseDuration(element) || 0;
-  var removeEmulate = emulateTransitionEnd(element, duration, padding);
-  var remove = esm_listen(element, 'transitionend', handler);
-  return function () {
-    removeEmulate();
-    remove();
-  };
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/activeElement.js
-
-/**
- * Returns the actively focused element safely.
+ * Mimics a React class component's state model, of having a single unified
+ * `state` object and an updater that merges updates into the existing state, as
+ * opposed to replacing it.
  *
- * @param doc the document to check
+ * ```js
+ * const [state, setState] = useMergeState({ name: 'Betsy', age: 24 })
+ *
+ * setState({ name: 'Johan' }) // { name: 'Johan', age: 24 }
+ *
+ * setState(state => ({ age: state.age + 10 })) // { name: 'Johan', age: 34 }
+ * ```
+ *
+ * @param initialState The initial state object
  */
+function useMergeState_useMergeState(initialState) {
+  var _useState = useState(initialState),
+      state = _useState[0],
+      setState = _useState[1];
 
-function activeElement(doc) {
-  if (doc === void 0) {
-    doc = ownerDocument();
-  }
+  var updater = useCallback(function (update) {
+    if (update === null) return;
 
-  // Support: IE 9 only
-  // IE9 throws an "Unspecified error" accessing document.activeElement from an <iframe>
-  try {
-    var active = doc.activeElement; // IE11 returns a seemingly empty object in some cases when accessing
-    // document.activeElement from an <iframe>
-
-    if (!active || !active.nodeName) return null;
-    return active;
-  } catch (e) {
-    /* ie throws if no active element */
-    return doc.body;
-  }
+    if (typeof update === 'function') {
+      setState(function (state) {
+        var nextState = update(state);
+        return nextState == null ? state : useMergeState_extends({}, state, nextState);
+      });
+    } else {
+      setState(function (state) {
+        return useMergeState_extends({}, state, update);
+      });
+    }
+  }, [setState]);
+  return [state, updater];
 }
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/contains.js
-/* eslint-disable no-bitwise, no-cond-assign */
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useMergeStateFromProps.js
 
-/**
- * Checks if an element contains another given element.
- * 
- * @param context the context element
- * @param node the element to check
- */
-function contains(context, node) {
-  // HTML DOM and SVG DOM may have different support levels,
-  // so we need to check on context instead of a document root element.
-  if (context.contains) return context.contains(node);
-  if (context.compareDocumentPosition) return context === node || !!(context.compareDocumentPosition(node) & 16);
+function useMergeStateFromProps(props, gDSFP, initialState) {
+  var _useMergeState = useMergeState(initialState),
+      state = _useMergeState[0],
+      setState = _useMergeState[1];
+
+  var nextState = gDSFP(props, state);
+  if (nextState !== null) setState(nextState);
+  return [state, setState];
 }
 ;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useMounted.js
 
@@ -80798,557 +80290,219 @@ function usePrevious(value) {
   });
   return ref.current;
 }
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/getScrollbarWidth.js
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useImage.js
+
+
 /**
- * Get the width of the vertical window scrollbar if it's visible
- */
-function getBodyScrollbarWidth(ownerDocument = document) {
-  const window = ownerDocument.defaultView;
-  return Math.abs(window.innerWidth - ownerDocument.documentElement.clientWidth);
-}
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/ModalManager.js
-
-
-
-const OPEN_DATA_ATTRIBUTE = dataAttr('modal-open');
-/**
- * Manages a stack of Modals as well as ensuring
- * body scrolling is is disabled and padding accounted for
- */
-
-class ModalManager {
-  constructor({
-    ownerDocument,
-    handleContainerOverflow = true,
-    isRTL = false
-  } = {}) {
-    this.handleContainerOverflow = handleContainerOverflow;
-    this.isRTL = isRTL;
-    this.modals = [];
-    this.ownerDocument = ownerDocument;
-  }
-
-  getScrollbarWidth() {
-    return getBodyScrollbarWidth(this.ownerDocument);
-  }
-
-  getElement() {
-    return (this.ownerDocument || document).body;
-  }
-
-  setModalAttributes(_modal) {// For overriding
-  }
-
-  removeModalAttributes(_modal) {// For overriding
-  }
-
-  setContainerStyle(containerState) {
-    const style = {
-      overflow: 'hidden'
-    }; // we are only interested in the actual `style` here
-    // because we will override it
-
-    const paddingProp = this.isRTL ? 'paddingLeft' : 'paddingRight';
-    const container = this.getElement();
-    containerState.style = {
-      overflow: container.style.overflow,
-      [paddingProp]: container.style[paddingProp]
-    };
-
-    if (containerState.scrollBarWidth) {
-      // use computed style, here to get the real padding
-      // to add our scrollbar width
-      style[paddingProp] = `${parseInt(css(container, paddingProp) || '0', 10) + containerState.scrollBarWidth}px`;
-    }
-
-    container.setAttribute(OPEN_DATA_ATTRIBUTE, '');
-    css(container, style);
-  }
-
-  reset() {
-    [...this.modals].forEach(m => this.remove(m));
-  }
-
-  removeContainerStyle(containerState) {
-    const container = this.getElement();
-    container.removeAttribute(OPEN_DATA_ATTRIBUTE);
-    Object.assign(container.style, containerState.style);
-  }
-
-  add(modal) {
-    let modalIdx = this.modals.indexOf(modal);
-
-    if (modalIdx !== -1) {
-      return modalIdx;
-    }
-
-    modalIdx = this.modals.length;
-    this.modals.push(modal);
-    this.setModalAttributes(modal);
-
-    if (modalIdx !== 0) {
-      return modalIdx;
-    }
-
-    this.state = {
-      scrollBarWidth: this.getScrollbarWidth(),
-      style: {}
-    };
-
-    if (this.handleContainerOverflow) {
-      this.setContainerStyle(this.state);
-    }
-
-    return modalIdx;
-  }
-
-  remove(modal) {
-    const modalIdx = this.modals.indexOf(modal);
-
-    if (modalIdx === -1) {
-      return;
-    }
-
-    this.modals.splice(modalIdx, 1); // if that was the last modal in a container,
-    // clean up the container
-
-    if (!this.modals.length && this.handleContainerOverflow) {
-      this.removeContainerStyle(this.state);
-    }
-
-    this.removeModalAttributes(modal);
-  }
-
-  isTopModal(modal) {
-    return !!this.modals.length && this.modals[this.modals.length - 1] === modal;
-  }
-
-}
-
-/* harmony default export */ const esm_ModalManager = (ModalManager);
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/useWindow.js
-
-
-const Context = /*#__PURE__*/(0,react.createContext)(canUseDOM ? window : undefined);
-const WindowProvider = Context.Provider;
-/**
- * The document "window" placed in React context. Helpful for determining
- * SSR context, or when rendering into an iframe.
+ * Fetch and load an image for programatic use such as in a `<canvas>` element.
  *
- * @returns the current window
+ * @param imageOrUrl The `HtmlImageElement` or image url to load
+ * @param crossOrigin The `crossorigin` attribute to set
+ *
+ * ```ts
+ * const { image, error } = useImage('/static/kittens.png')
+ * const ref = useRef<HTMLCanvasElement>()
+ *
+ * useEffect(() => {
+ *   const ctx = ref.current.getContext('2d')
+ *
+ *   if (image) {
+ *     ctx.drawImage(image, 0, 0)
+ *   }
+ * }, [ref, image])
+ *
+ * return (
+ *   <>
+ *     {error && "there was a problem loading the image"}
+ *     <canvas ref={ref} />
+ *   </>
+ * ```
+ */
+function useImage(imageOrUrl, crossOrigin) {
+  var _useState = useState({
+    image: null,
+    error: null
+  }),
+      state = _useState[0],
+      setState = _useState[1];
+
+  useEffect(function () {
+    if (!imageOrUrl) return undefined;
+    var image;
+
+    if (typeof imageOrUrl === 'string') {
+      image = new Image();
+      if (crossOrigin) image.crossOrigin = crossOrigin;
+      image.src = imageOrUrl;
+    } else {
+      image = imageOrUrl;
+
+      if (image.complete && image.naturalHeight > 0) {
+        setState({
+          image: image,
+          error: null
+        });
+        return;
+      }
+    }
+
+    function onLoad() {
+      setState({
+        image: image,
+        error: null
+      });
+    }
+
+    function onError(error) {
+      setState({
+        image: image,
+        error: error
+      });
+    }
+
+    image.addEventListener('load', onLoad);
+    image.addEventListener('error', onError);
+    return function () {
+      image.removeEventListener('load', onLoad);
+      image.removeEventListener('error', onError);
+    };
+  }, [imageOrUrl, crossOrigin]);
+  return state;
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useIsomorphicEffect.js
+
+var isReactNative = typeof __webpack_require__.g !== 'undefined' && // @ts-ignore
+__webpack_require__.g.navigator && // @ts-ignore
+__webpack_require__.g.navigator.product === 'ReactNative';
+var isDOM = typeof document !== 'undefined';
+/**
+ * Is `useLayoutEffect` in a DOM or React Native environment, otherwise resolves to useEffect
+ * Only useful to avoid the console warning.
+ *
+ * PREFER `useEffect` UNLESS YOU KNOW WHAT YOU ARE DOING.
+ *
+ * @category effects
  */
 
-function useWindow() {
-  return (0,react.useContext)(Context);
-}
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/useWaitForDOMRef.js
+/* harmony default export */ const useIsomorphicEffect = (isDOM || isReactNative ? react.useLayoutEffect : react.useEffect);
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useResizeObserver.js
 
 
+var targetMap = new WeakMap();
+var resizeObserver;
 
-
-const resolveContainerRef = (ref, document) => {
-  var _ref;
-
-  if (!canUseDOM) return null;
-  if (ref == null) return (document || ownerDocument()).body;
-  if (typeof ref === 'function') ref = ref();
-  if (ref && 'current' in ref) ref = ref.current;
-  if ((_ref = ref) != null && _ref.nodeType) return ref || null;
-  return null;
-};
-function useWaitForDOMRef(ref, onResolved) {
-  const window = useWindow();
-  const [resolvedRef, setRef] = (0,react.useState)(() => resolveContainerRef(ref, window == null ? void 0 : window.document));
-
-  if (!resolvedRef) {
-    const earlyRef = resolveContainerRef(ref);
-    if (earlyRef) setRef(earlyRef);
-  }
-
-  (0,react.useEffect)(() => {
-    if (onResolved && resolvedRef) {
-      onResolved(resolvedRef);
-    }
-  }, [onResolved, resolvedRef]);
-  (0,react.useEffect)(() => {
-    const nextRef = resolveContainerRef(ref);
-
-    if (nextRef !== resolvedRef) {
-      setRef(nextRef);
-    }
-  }, [ref, resolvedRef]);
-  return resolvedRef;
-}
-;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/Modal.js
-const Modal_excluded = ["show", "role", "className", "style", "children", "backdrop", "keyboard", "onBackdropClick", "onEscapeKeyDown", "transition", "backdropTransition", "autoFocus", "enforceFocus", "restoreFocus", "restoreFocusOptions", "renderDialog", "renderBackdrop", "manager", "container", "onShow", "onHide", "onExit", "onExited", "onExiting", "onEnter", "onEntering", "onEntered"];
-
-function Modal_objectWithoutPropertiesLoose(source, excluded) { if (source == null) return {}; var target = {}; var sourceKeys = Object.keys(source); var key, i; for (i = 0; i < sourceKeys.length; i++) { key = sourceKeys[i]; if (excluded.indexOf(key) >= 0) continue; target[key] = source[key]; } return target; }
-
-/* eslint-disable @typescript-eslint/no-use-before-define, react/prop-types */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-let manager;
-
-function getManager(window) {
-  if (!manager) manager = new esm_ModalManager({
-    ownerDocument: window == null ? void 0 : window.document
-  });
-  return manager;
-}
-
-function useModalManager(provided) {
-  const window = useWindow();
-  const modalManager = provided || getManager(window);
-  const modal = (0,react.useRef)({
-    dialog: null,
-    backdrop: null
-  });
-  return Object.assign(modal.current, {
-    add: () => modalManager.add(modal.current),
-    remove: () => modalManager.remove(modal.current),
-    isTopModal: () => modalManager.isTopModal(modal.current),
-    setDialogRef: (0,react.useCallback)(ref => {
-      modal.current.dialog = ref;
-    }, []),
-    setBackdropRef: (0,react.useCallback)(ref => {
-      modal.current.backdrop = ref;
-    }, [])
+function getResizeObserver() {
+  // eslint-disable-next-line no-return-assign
+  return resizeObserver = resizeObserver || new window.ResizeObserver(function (entries) {
+    entries.forEach(function (entry) {
+      var handler = targetMap.get(entry.target);
+      if (handler) handler(entry.contentRect);
+    });
   });
 }
+/**
+ * Efficiently observe size changes on an element. Depends on the `ResizeObserver` api,
+ * and polyfills are needed in older browsers.
+ *
+ * ```ts
+ * const [ref, attachRef] = useCallbackRef(null);
+ *
+ * const rect = useResizeObserver(ref);
+ *
+ * return (
+ *  <div ref={attachRef}>
+ *    {JSON.stringify(rect)}
+ *  </div>
+ * )
+ * ```
+ *
+ * @param element The DOM element to observe
+ */
 
-const Modal = /*#__PURE__*/(0,react.forwardRef)((_ref, ref) => {
+
+function useResizeObserver(element) {
+  var _useState = useState(null),
+      rect = _useState[0],
+      setRect = _useState[1];
+
+  useEffect(function () {
+    if (!element) return;
+    getResizeObserver().observe(element);
+    setRect(element.getBoundingClientRect());
+    targetMap.set(element, function (rect) {
+      setRect(rect);
+    });
+    return function () {
+      targetMap.delete(element);
+    };
+  }, [element]);
+  return rect;
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/index.js
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/Anchor.js
+const Anchor_excluded = ["onKeyDown"];
+
+function Anchor_objectWithoutPropertiesLoose(source, excluded) { if (source == null) return {}; var target = {}; var sourceKeys = Object.keys(source); var key, i; for (i = 0; i < sourceKeys.length; i++) { key = sourceKeys[i]; if (excluded.indexOf(key) >= 0) continue; target[key] = source[key]; } return target; }
+
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+
+/* eslint-disable jsx-a11y/anchor-has-content */
+
+
+
+
+function Anchor_isTrivialHref(href) {
+  return !href || href.trim() === '#';
+}
+
+/**
+ * An generic `<a>` component that covers a few A11y cases, ensuring that
+ * cases where the `href` is missing or trivial like "#" are treated like buttons.
+ */
+const Anchor = /*#__PURE__*/react.forwardRef((_ref, ref) => {
   let {
-    show = false,
-    role = 'dialog',
-    className,
-    style,
-    children,
-    backdrop = true,
-    keyboard = true,
-    onBackdropClick,
-    onEscapeKeyDown,
-    transition,
-    backdropTransition,
-    autoFocus = true,
-    enforceFocus = true,
-    restoreFocus = true,
-    restoreFocusOptions,
-    renderDialog,
-    renderBackdrop = props => /*#__PURE__*/(0,jsx_runtime.jsx)("div", Object.assign({}, props)),
-    manager: providedManager,
-    container: containerRef,
-    onShow,
-    onHide = () => {},
-    onExit,
-    onExited,
-    onExiting,
-    onEnter,
-    onEntering,
-    onEntered
+    onKeyDown
   } = _ref,
-      rest = Modal_objectWithoutPropertiesLoose(_ref, Modal_excluded);
+      props = Anchor_objectWithoutPropertiesLoose(_ref, Anchor_excluded);
 
-  const container = useWaitForDOMRef(containerRef);
-  const modal = useModalManager(providedManager);
-  const isMounted = useMounted();
-  const prevShow = usePrevious(show);
-  const [exited, setExited] = (0,react.useState)(!show);
-  const lastFocusRef = (0,react.useRef)(null);
-  (0,react.useImperativeHandle)(ref, () => modal, [modal]);
+  const [buttonProps] = useButtonProps(Object.assign({
+    tagName: 'a'
+  }, props));
+  const handleKeyDown = useEventCallback_useEventCallback(e => {
+    buttonProps.onKeyDown(e);
+    onKeyDown == null ? void 0 : onKeyDown(e);
+  });
 
-  if (canUseDOM && !prevShow && show) {
-    lastFocusRef.current = activeElement();
+  if (Anchor_isTrivialHref(props.href) && !props.role || props.role === 'button') {
+    return /*#__PURE__*/(0,jsx_runtime.jsx)("a", Object.assign({
+      ref: ref
+    }, props, buttonProps, {
+      onKeyDown: handleKeyDown
+    }));
   }
 
-  if (!transition && !show && !exited) {
-    setExited(true);
-  } else if (show && exited) {
-    setExited(false);
-  }
-
-  const handleShow = useEventCallback(() => {
-    modal.add();
-    removeKeydownListenerRef.current = esm_listen(document, 'keydown', handleDocumentKeyDown);
-    removeFocusListenerRef.current = esm_listen(document, 'focus', // the timeout is necessary b/c this will run before the new modal is mounted
-    // and so steals focus from it
-    () => setTimeout(handleEnforceFocus), true);
-
-    if (onShow) {
-      onShow();
-    } // autofocus after onShow to not trigger a focus event for previous
-    // modals before this one is shown.
-
-
-    if (autoFocus) {
-      const currentActiveElement = activeElement(document);
-
-      if (modal.dialog && currentActiveElement && !contains(modal.dialog, currentActiveElement)) {
-        lastFocusRef.current = currentActiveElement;
-        modal.dialog.focus();
-      }
-    }
-  });
-  const handleHide = useEventCallback(() => {
-    modal.remove();
-    removeKeydownListenerRef.current == null ? void 0 : removeKeydownListenerRef.current();
-    removeFocusListenerRef.current == null ? void 0 : removeFocusListenerRef.current();
-
-    if (restoreFocus) {
-      var _lastFocusRef$current;
-
-      // Support: <=IE11 doesn't support `focus()` on svg elements (RB: #917)
-      (_lastFocusRef$current = lastFocusRef.current) == null ? void 0 : _lastFocusRef$current.focus == null ? void 0 : _lastFocusRef$current.focus(restoreFocusOptions);
-      lastFocusRef.current = null;
-    }
-  }); // TODO: try and combine these effects: https://github.com/react-bootstrap/react-overlays/pull/794#discussion_r409954120
-  // Show logic when:
-  //  - show is `true` _and_ `container` has resolved
-
-  (0,react.useEffect)(() => {
-    if (!show || !container) return;
-    handleShow();
-  }, [show, container,
-  /* should never change: */
-  handleShow]); // Hide cleanup logic when:
-  //  - `exited` switches to true
-  //  - component unmounts;
-
-  (0,react.useEffect)(() => {
-    if (!exited) return;
-    handleHide();
-  }, [exited, handleHide]);
-  useWillUnmount(() => {
-    handleHide();
-  }); // --------------------------------
-
-  const handleEnforceFocus = useEventCallback(() => {
-    if (!enforceFocus || !isMounted() || !modal.isTopModal()) {
-      return;
-    }
-
-    const currentActiveElement = activeElement();
-
-    if (modal.dialog && currentActiveElement && !contains(modal.dialog, currentActiveElement)) {
-      modal.dialog.focus();
-    }
-  });
-  const handleBackdropClick = useEventCallback(e => {
-    if (e.target !== e.currentTarget) {
-      return;
-    }
-
-    onBackdropClick == null ? void 0 : onBackdropClick(e);
-
-    if (backdrop === true) {
-      onHide();
-    }
-  });
-  const handleDocumentKeyDown = useEventCallback(e => {
-    if (keyboard && e.keyCode === 27 && modal.isTopModal()) {
-      onEscapeKeyDown == null ? void 0 : onEscapeKeyDown(e);
-
-      if (!e.defaultPrevented) {
-        onHide();
-      }
-    }
-  });
-  const removeFocusListenerRef = (0,react.useRef)();
-  const removeKeydownListenerRef = (0,react.useRef)();
-
-  const handleHidden = (...args) => {
-    setExited(true);
-    onExited == null ? void 0 : onExited(...args);
-  };
-
-  const Transition = transition;
-
-  if (!container || !(show || Transition && !exited)) {
-    return null;
-  }
-
-  const dialogProps = Object.assign({
-    role,
-    ref: modal.setDialogRef,
-    // apparently only works on the dialog role element
-    'aria-modal': role === 'dialog' ? true : undefined
-  }, rest, {
-    style,
-    className,
-    tabIndex: -1
-  });
-  let dialog = renderDialog ? renderDialog(dialogProps) : /*#__PURE__*/(0,jsx_runtime.jsx)("div", Object.assign({}, dialogProps, {
-    children: /*#__PURE__*/react.cloneElement(children, {
-      role: 'document'
-    })
+  return /*#__PURE__*/(0,jsx_runtime.jsx)("a", Object.assign({
+    ref: ref
+  }, props, {
+    onKeyDown: onKeyDown
   }));
-
-  if (Transition) {
-    dialog = /*#__PURE__*/(0,jsx_runtime.jsx)(Transition, {
-      appear: true,
-      unmountOnExit: true,
-      in: !!show,
-      onExit: onExit,
-      onExiting: onExiting,
-      onExited: handleHidden,
-      onEnter: onEnter,
-      onEntering: onEntering,
-      onEntered: onEntered,
-      children: dialog
-    });
-  }
-
-  let backdropElement = null;
-
-  if (backdrop) {
-    const BackdropTransition = backdropTransition;
-    backdropElement = renderBackdrop({
-      ref: modal.setBackdropRef,
-      onClick: handleBackdropClick
-    });
-
-    if (BackdropTransition) {
-      backdropElement = /*#__PURE__*/(0,jsx_runtime.jsx)(BackdropTransition, {
-        appear: true,
-        in: !!show,
-        children: backdropElement
-      });
-    }
-  }
-
-  return /*#__PURE__*/(0,jsx_runtime.jsx)(jsx_runtime.Fragment, {
-    children: /*#__PURE__*/react_dom.createPortal( /*#__PURE__*/(0,jsx_runtime.jsxs)(jsx_runtime.Fragment, {
-      children: [backdropElement, dialog]
-    }), container)
-  });
 });
-Modal.displayName = 'Modal';
-/* harmony default export */ const esm_Modal = (Object.assign(Modal, {
-  Manager: esm_ModalManager
-}));
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/hasClass.js
-/**
- * Checks if a given element has a CSS class.
- * 
- * @param element the element
- * @param className the CSS class name
- */
-function hasClass(element, className) {
-  if (element.classList) return !!className && element.classList.contains(className);
-  return (" " + (element.className.baseVal || element.className) + " ").indexOf(" " + className + " ") !== -1;
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/addClass.js
-
-/**
- * Adds a CSS class to a given element.
- * 
- * @param element the element
- * @param className the CSS class name
- */
-
-function addClass(element, className) {
-  if (element.classList) element.classList.add(className);else if (!hasClass(element, className)) if (typeof element.className === 'string') element.className = element.className + " " + className;else element.setAttribute('class', (element.className && element.className.baseVal || '') + " " + className);
-}
-;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/removeClass.js
-function replaceClassName(origClass, classToRemove) {
-  return origClass.replace(new RegExp("(^|\\s)" + classToRemove + "(?:\\s|$)", 'g'), '$1').replace(/\s+/g, ' ').replace(/^\s*|\s*$/g, '');
-}
-/**
- * Removes a CSS class from a given element.
- * 
- * @param element the element
- * @param className the CSS class name
- */
-
-
-function removeClass(element, className) {
-  if (element.classList) {
-    element.classList.remove(className);
-  } else if (typeof element.className === 'string') {
-    element.className = replaceClassName(element.className, className);
-  } else {
-    element.setAttribute('class', replaceClassName(element.className && element.className.baseVal || '', className));
-  }
-}
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/BootstrapModalManager.js
-
-
-
-
-
-const Selector = {
-  FIXED_CONTENT: '.fixed-top, .fixed-bottom, .is-fixed, .sticky-top',
-  STICKY_CONTENT: '.sticky-top',
-  NAVBAR_TOGGLER: '.navbar-toggler'
-};
-
-class BootstrapModalManager extends esm_ModalManager {
-  adjustAndStore(prop, element, adjust) {
-    const actual = element.style[prop]; // TODO: DOMStringMap and CSSStyleDeclaration aren't strictly compatible
-    // @ts-ignore
-
-    element.dataset[prop] = actual;
-    css(element, {
-      [prop]: `${parseFloat(css(element, prop)) + adjust}px`
-    });
-  }
-
-  restore(prop, element) {
-    const value = element.dataset[prop];
-
-    if (value !== undefined) {
-      delete element.dataset[prop];
-      css(element, {
-        [prop]: value
-      });
-    }
-  }
-
-  setContainerStyle(containerState) {
-    super.setContainerStyle(containerState);
-    const container = this.getElement();
-    addClass(container, 'modal-open');
-    if (!containerState.scrollBarWidth) return;
-    const paddingProp = this.isRTL ? 'paddingLeft' : 'paddingRight';
-    const marginProp = this.isRTL ? 'marginLeft' : 'marginRight';
-    qsa(container, Selector.FIXED_CONTENT).forEach(el => this.adjustAndStore(paddingProp, el, containerState.scrollBarWidth));
-    qsa(container, Selector.STICKY_CONTENT).forEach(el => this.adjustAndStore(marginProp, el, -containerState.scrollBarWidth));
-    qsa(container, Selector.NAVBAR_TOGGLER).forEach(el => this.adjustAndStore(marginProp, el, containerState.scrollBarWidth));
-  }
-
-  removeContainerStyle(containerState) {
-    super.removeContainerStyle(containerState);
-    const container = this.getElement();
-    removeClass(container, 'modal-open');
-    const paddingProp = this.isRTL ? 'paddingLeft' : 'paddingRight';
-    const marginProp = this.isRTL ? 'marginLeft' : 'marginRight';
-    qsa(container, Selector.FIXED_CONTENT).forEach(el => this.restore(paddingProp, el));
-    qsa(container, Selector.STICKY_CONTENT).forEach(el => this.restore(marginProp, el));
-    qsa(container, Selector.NAVBAR_TOGGLER).forEach(el => this.restore(marginProp, el));
-  }
-
-}
-
-let sharedManager;
-function getSharedManager(options) {
-  if (!sharedManager) sharedManager = new BootstrapModalManager(options);
-  return sharedManager;
-}
-/* harmony default export */ const esm_BootstrapModalManager = ((/* unused pure expression or super */ null && (BootstrapModalManager)));
+Anchor.displayName = 'Anchor';
+/* harmony default export */ const esm_Anchor = (Anchor);
 ;// CONCATENATED MODULE: ./node_modules/@babel/runtime/helpers/esm/setPrototypeOf.js
 function _setPrototypeOf(o, p) {
   _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) {
@@ -81802,6 +80956,247 @@ Transition.ENTERING = ENTERING;
 Transition.ENTERED = ENTERED;
 Transition.EXITING = EXITING;
 /* harmony default export */ const esm_Transition = (Transition);
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/ownerDocument.js
+/**
+ * Returns the owner document of a given element.
+ * 
+ * @param node the element
+ */
+function ownerDocument(node) {
+  return node && node.ownerDocument || document;
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/ownerWindow.js
+
+/**
+ * Returns the owner window of a given element.
+ * 
+ * @param node the element
+ */
+
+function ownerWindow(node) {
+  var doc = ownerDocument(node);
+  return doc && doc.defaultView || window;
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/getComputedStyle.js
+
+/**
+ * Returns one or all computed style properties of an element.
+ * 
+ * @param node the element
+ * @param psuedoElement the style property
+ */
+
+function getComputedStyle(node, psuedoElement) {
+  return ownerWindow(node).getComputedStyle(node, psuedoElement);
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/hyphenate.js
+var rUpper = /([A-Z])/g;
+function hyphenate(string) {
+  return string.replace(rUpper, '-$1').toLowerCase();
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/hyphenateStyle.js
+/**
+ * Copyright 2013-2014, Facebook, Inc.
+ * All rights reserved.
+ * https://github.com/facebook/react/blob/2aeb8a2a6beb00617a4217f7f8284924fa2ad819/src/vendor/core/hyphenateStyleName.js
+ */
+
+var msPattern = /^ms-/;
+function hyphenateStyleName(string) {
+  return hyphenate(string).replace(msPattern, '-ms-');
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/isTransform.js
+var supportedTransforms = /^((translate|rotate|scale)(X|Y|Z|3d)?|matrix(3d)?|perspective|skew(X|Y)?)$/i;
+function isTransform(value) {
+  return !!(value && supportedTransforms.test(value));
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/css.js
+
+
+
+
+function style(node, property) {
+  var css = '';
+  var transforms = '';
+
+  if (typeof property === 'string') {
+    return node.style.getPropertyValue(hyphenateStyleName(property)) || getComputedStyle(node).getPropertyValue(hyphenateStyleName(property));
+  }
+
+  Object.keys(property).forEach(function (key) {
+    var value = property[key];
+
+    if (!value && value !== 0) {
+      node.style.removeProperty(hyphenateStyleName(key));
+    } else if (isTransform(key)) {
+      transforms += key + "(" + value + ") ";
+    } else {
+      css += hyphenateStyleName(key) + ": " + value + ";";
+    }
+  });
+
+  if (transforms) {
+    css += "transform: " + transforms + ";";
+  }
+
+  node.style.cssText += ";" + css;
+}
+
+/* harmony default export */ const css = (style);
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/canUseDOM.js
+/* harmony default export */ const canUseDOM = (!!(typeof window !== 'undefined' && window.document && window.document.createElement));
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/addEventListener.js
+/* eslint-disable no-return-assign */
+
+var optionsSupported = false;
+var onceSupported = false;
+
+try {
+  var options = {
+    get passive() {
+      return optionsSupported = true;
+    },
+
+    get once() {
+      // eslint-disable-next-line no-multi-assign
+      return onceSupported = optionsSupported = true;
+    }
+
+  };
+
+  if (canUseDOM) {
+    window.addEventListener('test', options, options);
+    window.removeEventListener('test', options, true);
+  }
+} catch (e) {
+  /* */
+}
+
+/**
+ * An `addEventListener` ponyfill, supports the `once` option
+ * 
+ * @param node the element
+ * @param eventName the event name
+ * @param handle the handler
+ * @param options event options
+ */
+function addEventListener(node, eventName, handler, options) {
+  if (options && typeof options !== 'boolean' && !onceSupported) {
+    var once = options.once,
+        capture = options.capture;
+    var wrappedHandler = handler;
+
+    if (!onceSupported && once) {
+      wrappedHandler = handler.__once || function onceHandler(event) {
+        this.removeEventListener(eventName, onceHandler, capture);
+        handler.call(this, event);
+      };
+
+      handler.__once = wrappedHandler;
+    }
+
+    node.addEventListener(eventName, wrappedHandler, optionsSupported ? options : capture);
+  }
+
+  node.addEventListener(eventName, handler, options);
+}
+
+/* harmony default export */ const esm_addEventListener = (addEventListener);
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/removeEventListener.js
+/**
+ * A `removeEventListener` ponyfill
+ * 
+ * @param node the element
+ * @param eventName the event name
+ * @param handle the handler
+ * @param options event options
+ */
+function removeEventListener(node, eventName, handler, options) {
+  var capture = options && typeof options !== 'boolean' ? options.capture : options;
+  node.removeEventListener(eventName, handler, capture);
+
+  if (handler.__once) {
+    node.removeEventListener(eventName, handler.__once, capture);
+  }
+}
+
+/* harmony default export */ const esm_removeEventListener = (removeEventListener);
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/listen.js
+
+
+
+function listen(node, eventName, handler, options) {
+  esm_addEventListener(node, eventName, handler, options);
+  return function () {
+    esm_removeEventListener(node, eventName, handler, options);
+  };
+}
+
+/* harmony default export */ const esm_listen = (listen);
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/triggerEvent.js
+/**
+ * Triggers an event on a given element.
+ * 
+ * @param node the element
+ * @param eventName the event name to trigger
+ * @param bubbles whether the event should bubble up
+ * @param cancelable whether the event should be cancelable
+ */
+function triggerEvent(node, eventName, bubbles, cancelable) {
+  if (bubbles === void 0) {
+    bubbles = false;
+  }
+
+  if (cancelable === void 0) {
+    cancelable = true;
+  }
+
+  if (node) {
+    var event = document.createEvent('HTMLEvents');
+    event.initEvent(eventName, bubbles, cancelable);
+    node.dispatchEvent(event);
+  }
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/transitionEnd.js
+
+
+
+
+function parseDuration(node) {
+  var str = css(node, 'transitionDuration') || '';
+  var mult = str.indexOf('ms') === -1 ? 1000 : 1;
+  return parseFloat(str) * mult;
+}
+
+function emulateTransitionEnd(element, duration, padding) {
+  if (padding === void 0) {
+    padding = 5;
+  }
+
+  var called = false;
+  var handle = setTimeout(function () {
+    if (!called) triggerEvent(element, 'transitionend', true);
+  }, duration + padding);
+  var remove = esm_listen(element, 'transitionend', function () {
+    called = true;
+  }, {
+    once: true
+  });
+  return function () {
+    clearTimeout(handle);
+    remove();
+  };
+}
+
+function transitionEnd(element, handler, duration, padding) {
+  if (duration == null) duration = parseDuration(element) || 0;
+  var removeEmulate = emulateTransitionEnd(element, duration, padding);
+  var remove = esm_listen(element, 'transitionend', handler);
+  return function () {
+    removeEmulate();
+    remove();
+  };
+}
 ;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/transitionEndListener.js
 
 
@@ -81829,6 +81224,47 @@ function triggerBrowserReflow(node) {
   // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   node.offsetHeight;
 }
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useMergedRefs.js
+
+
+var toFnRef = function toFnRef(ref) {
+  return !ref || typeof ref === 'function' ? ref : function (value) {
+    ref.current = value;
+  };
+};
+
+function mergeRefs(refA, refB) {
+  var a = toFnRef(refA);
+  var b = toFnRef(refB);
+  return function (value) {
+    if (a) a(value);
+    if (b) b(value);
+  };
+}
+/**
+ * Create and returns a single callback ref composed from two other Refs.
+ *
+ * ```tsx
+ * const Button = React.forwardRef((props, ref) => {
+ *   const [element, attachRef] = useCallbackRef<HTMLButtonElement>();
+ *   const mergedRef = useMergedRefs(ref, attachRef);
+ *
+ *   return <button ref={mergedRef} {...props}/>
+ * })
+ * ```
+ *
+ * @param refA A Callback or mutable Ref
+ * @param refB A Callback or mutable Ref
+ * @category refs
+ */
+
+function useMergedRefs(refA, refB) {
+  return (0,react.useMemo)(function () {
+    return mergeRefs(refA, refB);
+  }, [refA, refB]);
+}
+
+/* harmony default export */ const esm_useMergedRefs = (useMergedRefs);
 ;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/safeFindDOMNode.js
 
 function safeFindDOMNode(componentOrElement) {
@@ -81944,6 +81380,1785 @@ const Fade = /*#__PURE__*/react.forwardRef(({
 Fade.defaultProps = Fade_defaultProps;
 Fade.displayName = 'Fade';
 /* harmony default export */ const esm_Fade = (Fade);
+// EXTERNAL MODULE: ./node_modules/prop-types/index.js
+var prop_types = __webpack_require__(5697);
+var prop_types_default = /*#__PURE__*/__webpack_require__.n(prop_types);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/CloseButton.js
+
+
+
+
+const propTypes = {
+  'aria-label': (prop_types_default()).string,
+  onClick: (prop_types_default()).func,
+
+  /**
+   * Render different color variant for the button.
+   *
+   * Omitting this will render the default dark color.
+   */
+  variant: prop_types_default().oneOf(['white'])
+};
+const CloseButton_defaultProps = {
+  'aria-label': 'Close'
+};
+const CloseButton = /*#__PURE__*/react.forwardRef(({
+  className,
+  variant,
+  ...props
+}, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)("button", {
+  ref: ref,
+  type: "button",
+  className: classnames_default()('btn-close', variant && `btn-close-${variant}`, className),
+  ...props
+}));
+CloseButton.displayName = 'CloseButton';
+CloseButton.propTypes = propTypes;
+CloseButton.defaultProps = CloseButton_defaultProps;
+/* harmony default export */ const esm_CloseButton = (CloseButton);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/divWithClassName.js
+
+
+
+/* harmony default export */ const divWithClassName = (className => /*#__PURE__*/react.forwardRef((p, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)("div", { ...p,
+  ref: ref,
+  className: classnames_default()(p.className, className)
+})));
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/camelize.js
+var rHyphen = /-(.)/g;
+function camelize(string) {
+  return string.replace(rHyphen, function (_, chr) {
+    return chr.toUpperCase();
+  });
+}
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/createWithBsPrefix.js
+
+
+
+
+
+
+const pascalCase = str => str[0].toUpperCase() + camelize(str).slice(1);
+
+// TODO: emstricten & fix the typing here! `createWithBsPrefix<TElementType>...`
+function createWithBsPrefix(prefix, {
+  displayName = pascalCase(prefix),
+  Component,
+  defaultProps
+} = {}) {
+  const BsComponent = /*#__PURE__*/react.forwardRef(({
+    className,
+    bsPrefix,
+    as: Tag = Component || 'div',
+    ...props
+  }, ref) => {
+    const resolvedPrefix = useBootstrapPrefix(bsPrefix, prefix);
+    return /*#__PURE__*/(0,jsx_runtime.jsx)(Tag, {
+      ref: ref,
+      className: classnames_default()(className, resolvedPrefix),
+      ...props
+    });
+  });
+  BsComponent.defaultProps = defaultProps;
+  BsComponent.displayName = displayName;
+  return BsComponent;
+}
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Alert.js
+
+
+
+
+
+
+
+
+
+
+
+
+const DivStyledAsH4 = divWithClassName('h4');
+DivStyledAsH4.displayName = 'DivStyledAsH4';
+const AlertHeading = createWithBsPrefix('alert-heading', {
+  Component: DivStyledAsH4
+});
+const AlertLink = createWithBsPrefix('alert-link', {
+  Component: esm_Anchor
+});
+const Alert_defaultProps = {
+  variant: 'primary',
+  show: true,
+  transition: esm_Fade,
+  closeLabel: 'Close alert'
+};
+const Alert = /*#__PURE__*/react.forwardRef((uncontrolledProps, ref) => {
+  const {
+    bsPrefix,
+    show,
+    closeLabel,
+    closeVariant,
+    className,
+    children,
+    variant,
+    onClose,
+    dismissible,
+    transition,
+    ...props
+  } = useUncontrolled(uncontrolledProps, {
+    show: 'onClose'
+  });
+  const prefix = useBootstrapPrefix(bsPrefix, 'alert');
+  const handleClose = useEventCallback_useEventCallback(e => {
+    if (onClose) {
+      onClose(false, e);
+    }
+  });
+  const Transition = transition === true ? esm_Fade : transition;
+
+  const alert = /*#__PURE__*/(0,jsx_runtime.jsxs)("div", {
+    role: "alert",
+    ...(!Transition ? props : undefined),
+    ref: ref,
+    className: classnames_default()(className, prefix, variant && `${prefix}-${variant}`, dismissible && `${prefix}-dismissible`),
+    children: [dismissible && /*#__PURE__*/(0,jsx_runtime.jsx)(esm_CloseButton, {
+      onClick: handleClose,
+      "aria-label": closeLabel,
+      variant: closeVariant
+    }), children]
+  });
+
+  if (!Transition) return show ? alert : null;
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(Transition, {
+    unmountOnExit: true,
+    ...props,
+    ref: undefined,
+    in: show,
+    children: alert
+  });
+});
+Alert.displayName = 'Alert';
+Alert.defaultProps = Alert_defaultProps;
+/* harmony default export */ const esm_Alert = (Object.assign(Alert, {
+  Link: AlertLink,
+  Heading: AlertHeading
+}));
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Feedback.js
+
+
+
+
+const Feedback_propTypes = {
+  /**
+   * Specify whether the feedback is for valid or invalid fields
+   *
+   * @type {('valid'|'invalid')}
+   */
+  type: (prop_types_default()).string,
+
+  /** Display feedback as a tooltip. */
+  tooltip: (prop_types_default()).bool,
+  as: (prop_types_default()).elementType
+};
+const Feedback = /*#__PURE__*/react.forwardRef( // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+({
+  as: Component = 'div',
+  className,
+  type = 'valid',
+  tooltip = false,
+  ...props
+}, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
+  ref: ref,
+  className: classnames_default()(className, `${type}-${tooltip ? 'tooltip' : 'feedback'}`)
+}));
+Feedback.displayName = 'Feedback';
+Feedback.propTypes = Feedback_propTypes;
+/* harmony default export */ const esm_Feedback = (Feedback);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormContext.js
+ // TODO
+
+const FormContext = /*#__PURE__*/react.createContext({});
+/* harmony default export */ const esm_FormContext = (FormContext);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormCheckInput.js
+
+
+
+
+
+
+const FormCheckInput = /*#__PURE__*/react.forwardRef(({
+  id,
+  bsPrefix,
+  className,
+  type = 'checkbox',
+  isValid = false,
+  isInvalid = false,
+  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+  as: Component = 'input',
+  ...props
+}, ref) => {
+  const {
+    controlId
+  } = (0,react.useContext)(esm_FormContext);
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-check-input');
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
+    ref: ref,
+    type: type,
+    id: id || controlId,
+    className: classnames_default()(className, bsPrefix, isValid && 'is-valid', isInvalid && 'is-invalid')
+  });
+});
+FormCheckInput.displayName = 'FormCheckInput';
+/* harmony default export */ const esm_FormCheckInput = (FormCheckInput);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormCheckLabel.js
+
+
+
+
+
+
+const FormCheckLabel = /*#__PURE__*/react.forwardRef(({
+  bsPrefix,
+  className,
+  htmlFor,
+  ...props
+}, ref) => {
+  const {
+    controlId
+  } = (0,react.useContext)(esm_FormContext);
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-check-label');
+  return /*#__PURE__*/(0,jsx_runtime.jsx)("label", { ...props,
+    ref: ref,
+    htmlFor: htmlFor || controlId,
+    className: classnames_default()(className, bsPrefix)
+  });
+});
+FormCheckLabel.displayName = 'FormCheckLabel';
+/* harmony default export */ const esm_FormCheckLabel = (FormCheckLabel);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/ElementChildren.js
+
+/**
+ * Iterates through children that are typically specified as `props.children`,
+ * but only maps over children that are "valid elements".
+ *
+ * The mapFunction provided index will be normalised to the components mapped,
+ * so an invalid component would not increase the index.
+ *
+ */
+
+function map(children, func) {
+  let index = 0;
+  return React.Children.map(children, child => /*#__PURE__*/React.isValidElement(child) ? func(child, index++) : child);
+}
+/**
+ * Iterates through children that are "valid elements".
+ *
+ * The provided forEachFunc(child, index) will be called for each
+ * leaf child with the index reflecting the position relative to "valid components".
+ */
+
+
+function forEach(children, func) {
+  let index = 0;
+  React.Children.forEach(children, child => {
+    if ( /*#__PURE__*/React.isValidElement(child)) func(child, index++);
+  });
+}
+/**
+ * Finds whether a component's `children` prop includes a React element of the
+ * specified type.
+ */
+
+
+function hasChildOfType(children, type) {
+  return react.Children.toArray(children).some(child => /*#__PURE__*/react.isValidElement(child) && child.type === type);
+}
+
+
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormCheck.js
+
+
+
+
+
+
+
+
+
+
+
+
+const FormCheck = /*#__PURE__*/react.forwardRef(({
+  id,
+  bsPrefix,
+  bsSwitchPrefix,
+  inline = false,
+  disabled = false,
+  isValid = false,
+  isInvalid = false,
+  feedbackTooltip = false,
+  feedback,
+  feedbackType,
+  className,
+  style,
+  title = '',
+  type = 'checkbox',
+  label,
+  children,
+  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+  as = 'input',
+  ...props
+}, ref) => {
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-check');
+  bsSwitchPrefix = useBootstrapPrefix(bsSwitchPrefix, 'form-switch');
+  const {
+    controlId
+  } = (0,react.useContext)(esm_FormContext);
+  const innerFormContext = (0,react.useMemo)(() => ({
+    controlId: id || controlId
+  }), [controlId, id]);
+  const hasLabel = !children && label != null && label !== false || hasChildOfType(children, esm_FormCheckLabel);
+
+  const input = /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormCheckInput, { ...props,
+    type: type === 'switch' ? 'checkbox' : type,
+    ref: ref,
+    isValid: isValid,
+    isInvalid: isInvalid,
+    disabled: disabled,
+    as: as
+  });
+
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormContext.Provider, {
+    value: innerFormContext,
+    children: /*#__PURE__*/(0,jsx_runtime.jsx)("div", {
+      style: style,
+      className: classnames_default()(className, hasLabel && bsPrefix, inline && `${bsPrefix}-inline`, type === 'switch' && bsSwitchPrefix),
+      children: children || /*#__PURE__*/(0,jsx_runtime.jsxs)(jsx_runtime.Fragment, {
+        children: [input, hasLabel && /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormCheckLabel, {
+          title: title,
+          children: label
+        }), feedback && /*#__PURE__*/(0,jsx_runtime.jsx)(esm_Feedback, {
+          type: feedbackType,
+          tooltip: feedbackTooltip,
+          children: feedback
+        })]
+      })
+    })
+  });
+});
+FormCheck.displayName = 'FormCheck';
+/* harmony default export */ const esm_FormCheck = (Object.assign(FormCheck, {
+  Input: esm_FormCheckInput,
+  Label: esm_FormCheckLabel
+}));
+// EXTERNAL MODULE: ./node_modules/warning/warning.js
+var warning = __webpack_require__(2473);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormControl.js
+
+
+
+
+
+
+
+
+const FormControl = /*#__PURE__*/react.forwardRef(({
+  bsPrefix,
+  type,
+  size,
+  htmlSize,
+  id,
+  className,
+  isValid = false,
+  isInvalid = false,
+  plaintext,
+  readOnly,
+  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+  as: Component = 'input',
+  ...props
+}, ref) => {
+  const {
+    controlId
+  } = (0,react.useContext)(esm_FormContext);
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-control');
+  let classes;
+
+  if (plaintext) {
+    classes = {
+      [`${bsPrefix}-plaintext`]: true
+    };
+  } else {
+    classes = {
+      [bsPrefix]: true,
+      [`${bsPrefix}-${size}`]: size
+    };
+  }
+
+   false ? 0 : void 0;
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
+    type: type,
+    size: htmlSize,
+    ref: ref,
+    readOnly: readOnly,
+    id: id || controlId,
+    className: classnames_default()(className, classes, isValid && `is-valid`, isInvalid && `is-invalid`, type === 'color' && `${bsPrefix}-color`)
+  });
+});
+FormControl.displayName = 'FormControl';
+/* harmony default export */ const esm_FormControl = (Object.assign(FormControl, {
+  Feedback: esm_Feedback
+}));
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormFloating.js
+
+/* harmony default export */ const FormFloating = (createWithBsPrefix('form-floating'));
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormGroup.js
+
+
+
+
+const FormGroup = /*#__PURE__*/react.forwardRef(({
+  controlId,
+  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+  as: Component = 'div',
+  ...props
+}, ref) => {
+  const context = (0,react.useMemo)(() => ({
+    controlId
+  }), [controlId]);
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormContext.Provider, {
+    value: context,
+    children: /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
+      ref: ref
+    })
+  });
+});
+FormGroup.displayName = 'FormGroup';
+/* harmony default export */ const esm_FormGroup = (FormGroup);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Col.js
+
+
+
+
+function useCol({
+  as,
+  bsPrefix,
+  className,
+  ...props
+}) {
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'col');
+  const breakpoints = useBootstrapBreakpoints();
+  const spans = [];
+  const classes = [];
+  breakpoints.forEach(brkPoint => {
+    const propValue = props[brkPoint];
+    delete props[brkPoint];
+    let span;
+    let offset;
+    let order;
+
+    if (typeof propValue === 'object' && propValue != null) {
+      ({
+        span,
+        offset,
+        order
+      } = propValue);
+    } else {
+      span = propValue;
+    }
+
+    const infix = brkPoint !== 'xs' ? `-${brkPoint}` : '';
+    if (span) spans.push(span === true ? `${bsPrefix}${infix}` : `${bsPrefix}${infix}-${span}`);
+    if (order != null) classes.push(`order${infix}-${order}`);
+    if (offset != null) classes.push(`offset${infix}-${offset}`);
+  });
+  return [{ ...props,
+    className: classnames_default()(className, ...spans, ...classes)
+  }, {
+    as,
+    bsPrefix,
+    spans
+  }];
+}
+const Col = /*#__PURE__*/react.forwardRef( // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+(props, ref) => {
+  const [{
+    className,
+    ...colProps
+  }, {
+    as: Component = 'div',
+    bsPrefix,
+    spans
+  }] = useCol(props);
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...colProps,
+    ref: ref,
+    className: classnames_default()(className, !spans.length && bsPrefix)
+  });
+});
+Col.displayName = 'Col';
+/* harmony default export */ const esm_Col = (Col);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormLabel.js
+
+
+
+
+
+
+
+
+const FormLabel_defaultProps = {
+  column: false,
+  visuallyHidden: false
+};
+const FormLabel = /*#__PURE__*/react.forwardRef(({
+  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+  as: Component = 'label',
+  bsPrefix,
+  column,
+  visuallyHidden,
+  className,
+  htmlFor,
+  ...props
+}, ref) => {
+  const {
+    controlId
+  } = (0,react.useContext)(esm_FormContext);
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-label');
+  let columnClass = 'col-form-label';
+  if (typeof column === 'string') columnClass = `${columnClass} ${columnClass}-${column}`;
+  const classes = classnames_default()(className, bsPrefix, visuallyHidden && 'visually-hidden', column && columnClass);
+   false ? 0 : void 0;
+  htmlFor = htmlFor || controlId;
+  if (column) return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_Col, {
+    ref: ref,
+    as: "label",
+    className: classes,
+    htmlFor: htmlFor,
+    ...props
+  });
+  return (
+    /*#__PURE__*/
+    // eslint-disable-next-line jsx-a11y/label-has-for, jsx-a11y/label-has-associated-control
+    (0,jsx_runtime.jsx)(Component, {
+      ref: ref,
+      className: classes,
+      htmlFor: htmlFor,
+      ...props
+    })
+  );
+});
+FormLabel.displayName = 'FormLabel';
+FormLabel.defaultProps = FormLabel_defaultProps;
+/* harmony default export */ const esm_FormLabel = (FormLabel);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormRange.js
+
+
+
+
+
+
+const FormRange = /*#__PURE__*/react.forwardRef(({
+  bsPrefix,
+  className,
+  id,
+  ...props
+}, ref) => {
+  const {
+    controlId
+  } = (0,react.useContext)(esm_FormContext);
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-range');
+  return /*#__PURE__*/(0,jsx_runtime.jsx)("input", { ...props,
+    type: "range",
+    ref: ref,
+    className: classnames_default()(className, bsPrefix),
+    id: id || controlId
+  });
+});
+FormRange.displayName = 'FormRange';
+/* harmony default export */ const esm_FormRange = (FormRange);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormSelect.js
+
+
+
+
+
+
+const FormSelect = /*#__PURE__*/react.forwardRef(({
+  bsPrefix,
+  size,
+  htmlSize,
+  className,
+  isValid = false,
+  isInvalid = false,
+  id,
+  ...props
+}, ref) => {
+  const {
+    controlId
+  } = (0,react.useContext)(esm_FormContext);
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-select');
+  return /*#__PURE__*/(0,jsx_runtime.jsx)("select", { ...props,
+    size: htmlSize,
+    ref: ref,
+    className: classnames_default()(className, bsPrefix, size && `${bsPrefix}-${size}`, isValid && `is-valid`, isInvalid && `is-invalid`),
+    id: id || controlId
+  });
+});
+FormSelect.displayName = 'FormSelect';
+/* harmony default export */ const esm_FormSelect = (FormSelect);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FormText.js
+
+
+
+
+const FormText = /*#__PURE__*/react.forwardRef( // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+({
+  bsPrefix,
+  className,
+  as: Component = 'small',
+  muted,
+  ...props
+}, ref) => {
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-text');
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
+    ref: ref,
+    className: classnames_default()(className, bsPrefix, muted && 'text-muted')
+  });
+});
+FormText.displayName = 'FormText';
+/* harmony default export */ const esm_FormText = (FormText);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Switch.js
+
+
+
+const Switch = /*#__PURE__*/react.forwardRef((props, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)(esm_FormCheck, { ...props,
+  ref: ref,
+  type: "switch"
+}));
+Switch.displayName = 'Switch';
+/* harmony default export */ const esm_Switch = (Object.assign(Switch, {
+  Input: esm_FormCheck.Input,
+  Label: esm_FormCheck.Label
+}));
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/FloatingLabel.js
+
+
+
+
+
+
+const FloatingLabel = /*#__PURE__*/react.forwardRef(({
+  bsPrefix,
+  className,
+  children,
+  controlId,
+  label,
+  ...props
+}, ref) => {
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'form-floating');
+  return /*#__PURE__*/(0,jsx_runtime.jsxs)(esm_FormGroup, {
+    ref: ref,
+    className: classnames_default()(className, bsPrefix),
+    controlId: controlId,
+    ...props,
+    children: [children, /*#__PURE__*/(0,jsx_runtime.jsx)("label", {
+      htmlFor: controlId,
+      children: label
+    })]
+  });
+});
+FloatingLabel.displayName = 'FloatingLabel';
+/* harmony default export */ const esm_FloatingLabel = (FloatingLabel);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Form.js
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const Form_propTypes = {
+  /**
+   * The Form `ref` will be forwarded to the underlying element,
+   * which means, unless it's rendered `as` a composite component,
+   * it will be a DOM node, when resolved.
+   *
+   * @type {ReactRef}
+   * @alias ref
+   */
+  _ref: (prop_types_default()).any,
+
+  /**
+   * Mark a form as having been validated. Setting it to `true` will
+   * toggle any validation styles on the forms elements.
+   */
+  validated: (prop_types_default()).bool,
+  as: (prop_types_default()).elementType
+};
+const Form = /*#__PURE__*/react.forwardRef(({
+  className,
+  validated,
+  // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+  as: Component = 'form',
+  ...props
+}, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)(Component, { ...props,
+  ref: ref,
+  className: classnames_default()(className, validated && 'was-validated')
+}));
+Form.displayName = 'Form';
+Form.propTypes = Form_propTypes;
+/* harmony default export */ const esm_Form = (Object.assign(Form, {
+  Group: esm_FormGroup,
+  Control: esm_FormControl,
+  Floating: FormFloating,
+  Check: esm_FormCheck,
+  Switch: esm_Switch,
+  Label: esm_FormLabel,
+  Text: esm_FormText,
+  Range: esm_FormRange,
+  Select: esm_FormSelect,
+  FloatingLabel: esm_FloatingLabel
+}));
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/querySelectorAll.js
+var toArray = Function.prototype.bind.call(Function.prototype.call, [].slice);
+/**
+ * Runs `querySelectorAll` on a given element.
+ * 
+ * @param element the element
+ * @param selector the selector
+ */
+
+function qsa(element, selector) {
+  return toArray(element.querySelectorAll(selector));
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useForceUpdate.js
+
+/**
+ * Returns a function that triggers a component update. the hook equivalent to
+ * `this.forceUpdate()` in a class component. In most cases using a state value directly
+ * is preferable but may be required in some advanced usages of refs for interop or
+ * when direct DOM manipulation is required.
+ *
+ * ```ts
+ * const forceUpdate = useForceUpdate();
+ *
+ * const updateOnClick = useCallback(() => {
+ *  forceUpdate()
+ * }, [forceUpdate])
+ *
+ * return <button type="button" onClick={updateOnClick}>Hi there</button>
+ * ```
+ */
+
+function useForceUpdate() {
+  // The toggling state value is designed to defeat React optimizations for skipping
+  // updates when they are stricting equal to the last state value
+  var _useReducer = (0,react.useReducer)(function (state) {
+    return !state;
+  }, false),
+      dispatch = _useReducer[1];
+
+  return dispatch;
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/NavContext.js
+
+const NavContext = /*#__PURE__*/react.createContext(null);
+NavContext.displayName = 'NavContext';
+/* harmony default export */ const esm_NavContext = (NavContext);
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/SelectableContext.js
+
+const SelectableContext = /*#__PURE__*/react.createContext(null);
+const makeEventKey = (eventKey, href = null) => {
+  if (eventKey != null) return String(eventKey);
+  return href || null;
+};
+/* harmony default export */ const esm_SelectableContext = (SelectableContext);
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/TabContext.js
+
+const TabContext = /*#__PURE__*/react.createContext(null);
+/* harmony default export */ const esm_TabContext = (TabContext);
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/DataKey.js
+const ATTRIBUTE_PREFIX = `data-rr-ui-`;
+const PROPERTY_PREFIX = `rrUi`;
+function dataAttr(property) {
+  return `${ATTRIBUTE_PREFIX}${property}`;
+}
+function dataProp(property) {
+  return `${PROPERTY_PREFIX}${property}`;
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/NavItem.js
+const NavItem_excluded = ["as", "active", "eventKey"];
+
+function NavItem_objectWithoutPropertiesLoose(source, excluded) { if (source == null) return {}; var target = {}; var sourceKeys = Object.keys(source); var key, i; for (i = 0; i < sourceKeys.length; i++) { key = sourceKeys[i]; if (excluded.indexOf(key) >= 0) continue; target[key] = source[key]; } return target; }
+
+
+
+
+
+
+
+
+
+
+function useNavItem({
+  key,
+  onClick,
+  active,
+  id,
+  role,
+  disabled
+}) {
+  const parentOnSelect = (0,react.useContext)(esm_SelectableContext);
+  const navContext = (0,react.useContext)(esm_NavContext);
+  const tabContext = (0,react.useContext)(esm_TabContext);
+  let isActive = active;
+  const props = {
+    role
+  };
+
+  if (navContext) {
+    if (!role && navContext.role === 'tablist') props.role = 'tab';
+    const contextControllerId = navContext.getControllerId(key != null ? key : null);
+    const contextControlledId = navContext.getControlledId(key != null ? key : null); // @ts-ignore
+
+    props[dataAttr('event-key')] = key;
+    props.id = contextControllerId || id;
+    isActive = active == null && key != null ? navContext.activeKey === key : active;
+    /**
+     * Simplified scenario for `mountOnEnter`.
+     *
+     * While it would make sense to keep 'aria-controls' for tabs that have been mounted at least
+     * once, it would also complicate the code quite a bit, for very little gain.
+     * The following implementation is probably good enough.
+     *
+     * @see https://github.com/react-restart/ui/pull/40#issuecomment-1009971561
+     */
+
+    if (isActive || !(tabContext != null && tabContext.unmountOnExit) && !(tabContext != null && tabContext.mountOnEnter)) props['aria-controls'] = contextControlledId;
+  }
+
+  if (props.role === 'tab') {
+    props['aria-selected'] = isActive;
+
+    if (!isActive) {
+      props.tabIndex = -1;
+    }
+
+    if (disabled) {
+      props.tabIndex = -1;
+      props['aria-disabled'] = true;
+    }
+  }
+
+  props.onClick = useEventCallback_useEventCallback(e => {
+    if (disabled) return;
+    onClick == null ? void 0 : onClick(e);
+
+    if (key == null) {
+      return;
+    }
+
+    if (parentOnSelect && !e.isPropagationStopped()) {
+      parentOnSelect(key, e);
+    }
+  });
+  return [props, {
+    isActive
+  }];
+}
+const NavItem = /*#__PURE__*/react.forwardRef((_ref, ref) => {
+  let {
+    as: Component = esm_Button,
+    active,
+    eventKey
+  } = _ref,
+      options = NavItem_objectWithoutPropertiesLoose(_ref, NavItem_excluded);
+
+  const [props, meta] = useNavItem(Object.assign({
+    key: makeEventKey(eventKey, options.href),
+    active
+  }, options)); // @ts-ignore
+
+  props[dataAttr('active')] = meta.isActive;
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, Object.assign({}, options, props, {
+    ref: ref
+  }));
+});
+NavItem.displayName = 'NavItem';
+/* harmony default export */ const esm_NavItem = (NavItem);
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/Nav.js
+const Nav_excluded = ["as", "onSelect", "activeKey", "role", "onKeyDown"];
+
+function Nav_objectWithoutPropertiesLoose(source, excluded) { if (source == null) return {}; var target = {}; var sourceKeys = Object.keys(source); var key, i; for (i = 0; i < sourceKeys.length; i++) { key = sourceKeys[i]; if (excluded.indexOf(key) >= 0) continue; target[key] = source[key]; } return target; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+const Nav_noop = () => {};
+
+const EVENT_KEY_ATTR = dataAttr('event-key');
+const Nav = /*#__PURE__*/react.forwardRef((_ref, ref) => {
+  let {
+    // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+    as: Component = 'div',
+    onSelect,
+    activeKey,
+    role,
+    onKeyDown
+  } = _ref,
+      props = Nav_objectWithoutPropertiesLoose(_ref, Nav_excluded);
+
+  // A ref and forceUpdate for refocus, b/c we only want to trigger when needed
+  // and don't want to reset the set in the effect
+  const forceUpdate = useForceUpdate();
+  const needsRefocusRef = (0,react.useRef)(false);
+  const parentOnSelect = (0,react.useContext)(esm_SelectableContext);
+  const tabContext = (0,react.useContext)(esm_TabContext);
+  let getControlledId, getControllerId;
+
+  if (tabContext) {
+    role = role || 'tablist';
+    activeKey = tabContext.activeKey; // TODO: do we need to duplicate these?
+
+    getControlledId = tabContext.getControlledId;
+    getControllerId = tabContext.getControllerId;
+  }
+
+  const listNode = (0,react.useRef)(null);
+
+  const getNextActiveTab = offset => {
+    const currentListNode = listNode.current;
+    if (!currentListNode) return null;
+    const items = qsa(currentListNode, `[${EVENT_KEY_ATTR}]:not([aria-disabled=true])`);
+    const activeChild = currentListNode.querySelector('[aria-selected=true]');
+    if (!activeChild || activeChild !== document.activeElement) return null;
+    const index = items.indexOf(activeChild);
+    if (index === -1) return null;
+    let nextIndex = index + offset;
+    if (nextIndex >= items.length) nextIndex = 0;
+    if (nextIndex < 0) nextIndex = items.length - 1;
+    return items[nextIndex];
+  };
+
+  const handleSelect = (key, event) => {
+    if (key == null) return;
+    onSelect == null ? void 0 : onSelect(key, event);
+    parentOnSelect == null ? void 0 : parentOnSelect(key, event);
+  };
+
+  const handleKeyDown = event => {
+    onKeyDown == null ? void 0 : onKeyDown(event);
+
+    if (!tabContext) {
+      return;
+    }
+
+    let nextActiveChild;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        nextActiveChild = getNextActiveTab(-1);
+        break;
+
+      case 'ArrowRight':
+      case 'ArrowDown':
+        nextActiveChild = getNextActiveTab(1);
+        break;
+
+      default:
+        return;
+    }
+
+    if (!nextActiveChild) return;
+    event.preventDefault();
+    handleSelect(nextActiveChild.dataset[dataProp('EventKey')] || null, event);
+    needsRefocusRef.current = true;
+    forceUpdate();
+  };
+
+  (0,react.useEffect)(() => {
+    if (listNode.current && needsRefocusRef.current) {
+      const activeChild = listNode.current.querySelector(`[${EVENT_KEY_ATTR}][aria-selected=true]`);
+      activeChild == null ? void 0 : activeChild.focus();
+    }
+
+    needsRefocusRef.current = false;
+  });
+  const mergedRef = esm_useMergedRefs(ref, listNode);
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_SelectableContext.Provider, {
+    value: handleSelect,
+    children: /*#__PURE__*/(0,jsx_runtime.jsx)(esm_NavContext.Provider, {
+      value: {
+        role,
+        // used by NavLink to determine it's role
+        activeKey: makeEventKey(activeKey),
+        getControlledId: getControlledId || Nav_noop,
+        getControllerId: getControllerId || Nav_noop
+      },
+      children: /*#__PURE__*/(0,jsx_runtime.jsx)(Component, Object.assign({}, props, {
+        onKeyDown: handleKeyDown,
+        ref: mergedRef,
+        role: role
+      }))
+    })
+  });
+});
+Nav.displayName = 'Nav';
+/* harmony default export */ const esm_Nav = (Object.assign(Nav, {
+  Item: esm_NavItem
+}));
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/ListGroupItem.js
+
+
+
+
+
+
+
+const ListGroupItem = /*#__PURE__*/react.forwardRef(({
+  bsPrefix,
+  active,
+  disabled,
+  eventKey,
+  className,
+  variant,
+  action,
+  as,
+  ...props
+}, ref) => {
+  bsPrefix = useBootstrapPrefix(bsPrefix, 'list-group-item');
+  const [navItemProps, meta] = useNavItem({
+    key: makeEventKey(eventKey, props.href),
+    active,
+    ...props
+  });
+  const handleClick = useEventCallback_useEventCallback(event => {
+    if (disabled) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    navItemProps.onClick(event);
+  });
+
+  if (disabled && props.tabIndex === undefined) {
+    props.tabIndex = -1;
+    props['aria-disabled'] = true;
+  } // eslint-disable-next-line no-nested-ternary
+
+
+  const Component = as || (action ? props.href ? 'a' : 'button' : 'div');
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(Component, {
+    ref: ref,
+    ...props,
+    ...navItemProps,
+    onClick: handleClick,
+    className: classnames_default()(className, bsPrefix, meta.isActive && 'active', disabled && 'disabled', variant && `${bsPrefix}-${variant}`, action && `${bsPrefix}-action`)
+  });
+});
+ListGroupItem.displayName = 'ListGroupItem';
+/* harmony default export */ const esm_ListGroupItem = (ListGroupItem);
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/ListGroup.js
+
+
+
+
+
+
+
+
+const ListGroup = /*#__PURE__*/react.forwardRef((props, ref) => {
+  const {
+    className,
+    bsPrefix: initialBsPrefix,
+    variant,
+    horizontal,
+    numbered,
+    // Need to define the default "as" during prop destructuring to be compatible with styled-components github.com/react-bootstrap/react-bootstrap/issues/3595
+    as = 'div',
+    ...controlledProps
+  } = useUncontrolled(props, {
+    activeKey: 'onSelect'
+  });
+  const bsPrefix = useBootstrapPrefix(initialBsPrefix, 'list-group');
+  let horizontalVariant;
+
+  if (horizontal) {
+    horizontalVariant = horizontal === true ? 'horizontal' : `horizontal-${horizontal}`;
+  }
+
+   false ? 0 : void 0;
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(esm_Nav, {
+    ref: ref,
+    ...controlledProps,
+    as: as,
+    className: classnames_default()(className, bsPrefix, variant && `${bsPrefix}-${variant}`, horizontalVariant && `${bsPrefix}-${horizontalVariant}`, numbered && `${bsPrefix}-numbered`)
+  });
+});
+ListGroup.displayName = 'ListGroup';
+/* harmony default export */ const esm_ListGroup = (Object.assign(ListGroup, {
+  Item: esm_ListGroupItem
+}));
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/scrollbarSize.js
+
+var size;
+function scrollbarSize(recalc) {
+  if (!size && size !== 0 || recalc) {
+    if (canUseDOM) {
+      var scrollDiv = document.createElement('div');
+      scrollDiv.style.position = 'absolute';
+      scrollDiv.style.top = '-9999px';
+      scrollDiv.style.width = '50px';
+      scrollDiv.style.height = '50px';
+      scrollDiv.style.overflow = 'scroll';
+      document.body.appendChild(scrollDiv);
+      size = scrollDiv.offsetWidth - scrollDiv.clientWidth;
+      document.body.removeChild(scrollDiv);
+    }
+  }
+
+  return size;
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useUpdatedRef.js
+
+/**
+ * Returns a ref that is immediately updated with the new value
+ *
+ * @param value The Ref value
+ * @category refs
+ */
+
+function useUpdatedRef(value) {
+  var valueRef = (0,react.useRef)(value);
+  valueRef.current = value;
+  return valueRef;
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/hooks/esm/useWillUnmount.js
+
+
+/**
+ * Attach a callback that fires when a component unmounts
+ *
+ * @param fn Handler to run when the component unmounts
+ * @category effects
+ */
+
+function useWillUnmount(fn) {
+  var onUnmount = useUpdatedRef(fn);
+  (0,react.useEffect)(function () {
+    return function () {
+      return onUnmount.current();
+    };
+  }, []);
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/activeElement.js
+
+/**
+ * Returns the actively focused element safely.
+ *
+ * @param doc the document to check
+ */
+
+function activeElement(doc) {
+  if (doc === void 0) {
+    doc = ownerDocument();
+  }
+
+  // Support: IE 9 only
+  // IE9 throws an "Unspecified error" accessing document.activeElement from an <iframe>
+  try {
+    var active = doc.activeElement; // IE11 returns a seemingly empty object in some cases when accessing
+    // document.activeElement from an <iframe>
+
+    if (!active || !active.nodeName) return null;
+    return active;
+  } catch (e) {
+    /* ie throws if no active element */
+    return doc.body;
+  }
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/contains.js
+/* eslint-disable no-bitwise, no-cond-assign */
+
+/**
+ * Checks if an element contains another given element.
+ * 
+ * @param context the context element
+ * @param node the element to check
+ */
+function contains(context, node) {
+  // HTML DOM and SVG DOM may have different support levels,
+  // so we need to check on context instead of a document root element.
+  if (context.contains) return context.contains(node);
+  if (context.compareDocumentPosition) return context === node || !!(context.compareDocumentPosition(node) & 16);
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/getScrollbarWidth.js
+/**
+ * Get the width of the vertical window scrollbar if it's visible
+ */
+function getBodyScrollbarWidth(ownerDocument = document) {
+  const window = ownerDocument.defaultView;
+  return Math.abs(window.innerWidth - ownerDocument.documentElement.clientWidth);
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/ModalManager.js
+
+
+
+const OPEN_DATA_ATTRIBUTE = dataAttr('modal-open');
+/**
+ * Manages a stack of Modals as well as ensuring
+ * body scrolling is is disabled and padding accounted for
+ */
+
+class ModalManager {
+  constructor({
+    ownerDocument,
+    handleContainerOverflow = true,
+    isRTL = false
+  } = {}) {
+    this.handleContainerOverflow = handleContainerOverflow;
+    this.isRTL = isRTL;
+    this.modals = [];
+    this.ownerDocument = ownerDocument;
+  }
+
+  getScrollbarWidth() {
+    return getBodyScrollbarWidth(this.ownerDocument);
+  }
+
+  getElement() {
+    return (this.ownerDocument || document).body;
+  }
+
+  setModalAttributes(_modal) {// For overriding
+  }
+
+  removeModalAttributes(_modal) {// For overriding
+  }
+
+  setContainerStyle(containerState) {
+    const style = {
+      overflow: 'hidden'
+    }; // we are only interested in the actual `style` here
+    // because we will override it
+
+    const paddingProp = this.isRTL ? 'paddingLeft' : 'paddingRight';
+    const container = this.getElement();
+    containerState.style = {
+      overflow: container.style.overflow,
+      [paddingProp]: container.style[paddingProp]
+    };
+
+    if (containerState.scrollBarWidth) {
+      // use computed style, here to get the real padding
+      // to add our scrollbar width
+      style[paddingProp] = `${parseInt(css(container, paddingProp) || '0', 10) + containerState.scrollBarWidth}px`;
+    }
+
+    container.setAttribute(OPEN_DATA_ATTRIBUTE, '');
+    css(container, style);
+  }
+
+  reset() {
+    [...this.modals].forEach(m => this.remove(m));
+  }
+
+  removeContainerStyle(containerState) {
+    const container = this.getElement();
+    container.removeAttribute(OPEN_DATA_ATTRIBUTE);
+    Object.assign(container.style, containerState.style);
+  }
+
+  add(modal) {
+    let modalIdx = this.modals.indexOf(modal);
+
+    if (modalIdx !== -1) {
+      return modalIdx;
+    }
+
+    modalIdx = this.modals.length;
+    this.modals.push(modal);
+    this.setModalAttributes(modal);
+
+    if (modalIdx !== 0) {
+      return modalIdx;
+    }
+
+    this.state = {
+      scrollBarWidth: this.getScrollbarWidth(),
+      style: {}
+    };
+
+    if (this.handleContainerOverflow) {
+      this.setContainerStyle(this.state);
+    }
+
+    return modalIdx;
+  }
+
+  remove(modal) {
+    const modalIdx = this.modals.indexOf(modal);
+
+    if (modalIdx === -1) {
+      return;
+    }
+
+    this.modals.splice(modalIdx, 1); // if that was the last modal in a container,
+    // clean up the container
+
+    if (!this.modals.length && this.handleContainerOverflow) {
+      this.removeContainerStyle(this.state);
+    }
+
+    this.removeModalAttributes(modal);
+  }
+
+  isTopModal(modal) {
+    return !!this.modals.length && this.modals[this.modals.length - 1] === modal;
+  }
+
+}
+
+/* harmony default export */ const esm_ModalManager = (ModalManager);
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/useWindow.js
+
+
+const Context = /*#__PURE__*/(0,react.createContext)(canUseDOM ? window : undefined);
+const WindowProvider = Context.Provider;
+/**
+ * The document "window" placed in React context. Helpful for determining
+ * SSR context, or when rendering into an iframe.
+ *
+ * @returns the current window
+ */
+
+function useWindow() {
+  return (0,react.useContext)(Context);
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/useWaitForDOMRef.js
+
+
+
+
+const resolveContainerRef = (ref, document) => {
+  var _ref;
+
+  if (!canUseDOM) return null;
+  if (ref == null) return (document || ownerDocument()).body;
+  if (typeof ref === 'function') ref = ref();
+  if (ref && 'current' in ref) ref = ref.current;
+  if ((_ref = ref) != null && _ref.nodeType) return ref || null;
+  return null;
+};
+function useWaitForDOMRef(ref, onResolved) {
+  const window = useWindow();
+  const [resolvedRef, setRef] = (0,react.useState)(() => resolveContainerRef(ref, window == null ? void 0 : window.document));
+
+  if (!resolvedRef) {
+    const earlyRef = resolveContainerRef(ref);
+    if (earlyRef) setRef(earlyRef);
+  }
+
+  (0,react.useEffect)(() => {
+    if (onResolved && resolvedRef) {
+      onResolved(resolvedRef);
+    }
+  }, [onResolved, resolvedRef]);
+  (0,react.useEffect)(() => {
+    const nextRef = resolveContainerRef(ref);
+
+    if (nextRef !== resolvedRef) {
+      setRef(nextRef);
+    }
+  }, [ref, resolvedRef]);
+  return resolvedRef;
+}
+;// CONCATENATED MODULE: ./node_modules/@restart/ui/esm/Modal.js
+const Modal_excluded = ["show", "role", "className", "style", "children", "backdrop", "keyboard", "onBackdropClick", "onEscapeKeyDown", "transition", "backdropTransition", "autoFocus", "enforceFocus", "restoreFocus", "restoreFocusOptions", "renderDialog", "renderBackdrop", "manager", "container", "onShow", "onHide", "onExit", "onExited", "onExiting", "onEnter", "onEntering", "onEntered"];
+
+function Modal_objectWithoutPropertiesLoose(source, excluded) { if (source == null) return {}; var target = {}; var sourceKeys = Object.keys(source); var key, i; for (i = 0; i < sourceKeys.length; i++) { key = sourceKeys[i]; if (excluded.indexOf(key) >= 0) continue; target[key] = source[key]; } return target; }
+
+/* eslint-disable @typescript-eslint/no-use-before-define, react/prop-types */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+let manager;
+
+function getManager(window) {
+  if (!manager) manager = new esm_ModalManager({
+    ownerDocument: window == null ? void 0 : window.document
+  });
+  return manager;
+}
+
+function useModalManager(provided) {
+  const window = useWindow();
+  const modalManager = provided || getManager(window);
+  const modal = (0,react.useRef)({
+    dialog: null,
+    backdrop: null
+  });
+  return Object.assign(modal.current, {
+    add: () => modalManager.add(modal.current),
+    remove: () => modalManager.remove(modal.current),
+    isTopModal: () => modalManager.isTopModal(modal.current),
+    setDialogRef: (0,react.useCallback)(ref => {
+      modal.current.dialog = ref;
+    }, []),
+    setBackdropRef: (0,react.useCallback)(ref => {
+      modal.current.backdrop = ref;
+    }, [])
+  });
+}
+
+const Modal = /*#__PURE__*/(0,react.forwardRef)((_ref, ref) => {
+  let {
+    show = false,
+    role = 'dialog',
+    className,
+    style,
+    children,
+    backdrop = true,
+    keyboard = true,
+    onBackdropClick,
+    onEscapeKeyDown,
+    transition,
+    backdropTransition,
+    autoFocus = true,
+    enforceFocus = true,
+    restoreFocus = true,
+    restoreFocusOptions,
+    renderDialog,
+    renderBackdrop = props => /*#__PURE__*/(0,jsx_runtime.jsx)("div", Object.assign({}, props)),
+    manager: providedManager,
+    container: containerRef,
+    onShow,
+    onHide = () => {},
+    onExit,
+    onExited,
+    onExiting,
+    onEnter,
+    onEntering,
+    onEntered
+  } = _ref,
+      rest = Modal_objectWithoutPropertiesLoose(_ref, Modal_excluded);
+
+  const container = useWaitForDOMRef(containerRef);
+  const modal = useModalManager(providedManager);
+  const isMounted = useMounted();
+  const prevShow = usePrevious(show);
+  const [exited, setExited] = (0,react.useState)(!show);
+  const lastFocusRef = (0,react.useRef)(null);
+  (0,react.useImperativeHandle)(ref, () => modal, [modal]);
+
+  if (canUseDOM && !prevShow && show) {
+    lastFocusRef.current = activeElement();
+  }
+
+  if (!transition && !show && !exited) {
+    setExited(true);
+  } else if (show && exited) {
+    setExited(false);
+  }
+
+  const handleShow = useEventCallback_useEventCallback(() => {
+    modal.add();
+    removeKeydownListenerRef.current = esm_listen(document, 'keydown', handleDocumentKeyDown);
+    removeFocusListenerRef.current = esm_listen(document, 'focus', // the timeout is necessary b/c this will run before the new modal is mounted
+    // and so steals focus from it
+    () => setTimeout(handleEnforceFocus), true);
+
+    if (onShow) {
+      onShow();
+    } // autofocus after onShow to not trigger a focus event for previous
+    // modals before this one is shown.
+
+
+    if (autoFocus) {
+      const currentActiveElement = activeElement(document);
+
+      if (modal.dialog && currentActiveElement && !contains(modal.dialog, currentActiveElement)) {
+        lastFocusRef.current = currentActiveElement;
+        modal.dialog.focus();
+      }
+    }
+  });
+  const handleHide = useEventCallback_useEventCallback(() => {
+    modal.remove();
+    removeKeydownListenerRef.current == null ? void 0 : removeKeydownListenerRef.current();
+    removeFocusListenerRef.current == null ? void 0 : removeFocusListenerRef.current();
+
+    if (restoreFocus) {
+      var _lastFocusRef$current;
+
+      // Support: <=IE11 doesn't support `focus()` on svg elements (RB: #917)
+      (_lastFocusRef$current = lastFocusRef.current) == null ? void 0 : _lastFocusRef$current.focus == null ? void 0 : _lastFocusRef$current.focus(restoreFocusOptions);
+      lastFocusRef.current = null;
+    }
+  }); // TODO: try and combine these effects: https://github.com/react-bootstrap/react-overlays/pull/794#discussion_r409954120
+  // Show logic when:
+  //  - show is `true` _and_ `container` has resolved
+
+  (0,react.useEffect)(() => {
+    if (!show || !container) return;
+    handleShow();
+  }, [show, container,
+  /* should never change: */
+  handleShow]); // Hide cleanup logic when:
+  //  - `exited` switches to true
+  //  - component unmounts;
+
+  (0,react.useEffect)(() => {
+    if (!exited) return;
+    handleHide();
+  }, [exited, handleHide]);
+  useWillUnmount(() => {
+    handleHide();
+  }); // --------------------------------
+
+  const handleEnforceFocus = useEventCallback_useEventCallback(() => {
+    if (!enforceFocus || !isMounted() || !modal.isTopModal()) {
+      return;
+    }
+
+    const currentActiveElement = activeElement();
+
+    if (modal.dialog && currentActiveElement && !contains(modal.dialog, currentActiveElement)) {
+      modal.dialog.focus();
+    }
+  });
+  const handleBackdropClick = useEventCallback_useEventCallback(e => {
+    if (e.target !== e.currentTarget) {
+      return;
+    }
+
+    onBackdropClick == null ? void 0 : onBackdropClick(e);
+
+    if (backdrop === true) {
+      onHide();
+    }
+  });
+  const handleDocumentKeyDown = useEventCallback_useEventCallback(e => {
+    if (keyboard && e.keyCode === 27 && modal.isTopModal()) {
+      onEscapeKeyDown == null ? void 0 : onEscapeKeyDown(e);
+
+      if (!e.defaultPrevented) {
+        onHide();
+      }
+    }
+  });
+  const removeFocusListenerRef = (0,react.useRef)();
+  const removeKeydownListenerRef = (0,react.useRef)();
+
+  const handleHidden = (...args) => {
+    setExited(true);
+    onExited == null ? void 0 : onExited(...args);
+  };
+
+  const Transition = transition;
+
+  if (!container || !(show || Transition && !exited)) {
+    return null;
+  }
+
+  const dialogProps = Object.assign({
+    role,
+    ref: modal.setDialogRef,
+    // apparently only works on the dialog role element
+    'aria-modal': role === 'dialog' ? true : undefined
+  }, rest, {
+    style,
+    className,
+    tabIndex: -1
+  });
+  let dialog = renderDialog ? renderDialog(dialogProps) : /*#__PURE__*/(0,jsx_runtime.jsx)("div", Object.assign({}, dialogProps, {
+    children: /*#__PURE__*/react.cloneElement(children, {
+      role: 'document'
+    })
+  }));
+
+  if (Transition) {
+    dialog = /*#__PURE__*/(0,jsx_runtime.jsx)(Transition, {
+      appear: true,
+      unmountOnExit: true,
+      in: !!show,
+      onExit: onExit,
+      onExiting: onExiting,
+      onExited: handleHidden,
+      onEnter: onEnter,
+      onEntering: onEntering,
+      onEntered: onEntered,
+      children: dialog
+    });
+  }
+
+  let backdropElement = null;
+
+  if (backdrop) {
+    const BackdropTransition = backdropTransition;
+    backdropElement = renderBackdrop({
+      ref: modal.setBackdropRef,
+      onClick: handleBackdropClick
+    });
+
+    if (BackdropTransition) {
+      backdropElement = /*#__PURE__*/(0,jsx_runtime.jsx)(BackdropTransition, {
+        appear: true,
+        in: !!show,
+        children: backdropElement
+      });
+    }
+  }
+
+  return /*#__PURE__*/(0,jsx_runtime.jsx)(jsx_runtime.Fragment, {
+    children: /*#__PURE__*/react_dom.createPortal( /*#__PURE__*/(0,jsx_runtime.jsxs)(jsx_runtime.Fragment, {
+      children: [backdropElement, dialog]
+    }), container)
+  });
+});
+Modal.displayName = 'Modal';
+/* harmony default export */ const esm_Modal = (Object.assign(Modal, {
+  Manager: esm_ModalManager
+}));
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/hasClass.js
+/**
+ * Checks if a given element has a CSS class.
+ * 
+ * @param element the element
+ * @param className the CSS class name
+ */
+function hasClass(element, className) {
+  if (element.classList) return !!className && element.classList.contains(className);
+  return (" " + (element.className.baseVal || element.className) + " ").indexOf(" " + className + " ") !== -1;
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/addClass.js
+
+/**
+ * Adds a CSS class to a given element.
+ * 
+ * @param element the element
+ * @param className the CSS class name
+ */
+
+function addClass(element, className) {
+  if (element.classList) element.classList.add(className);else if (!hasClass(element, className)) if (typeof element.className === 'string') element.className = element.className + " " + className;else element.setAttribute('class', (element.className && element.className.baseVal || '') + " " + className);
+}
+;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/removeClass.js
+function replaceClassName(origClass, classToRemove) {
+  return origClass.replace(new RegExp("(^|\\s)" + classToRemove + "(?:\\s|$)", 'g'), '$1').replace(/\s+/g, ' ').replace(/^\s*|\s*$/g, '');
+}
+/**
+ * Removes a CSS class from a given element.
+ * 
+ * @param element the element
+ * @param className the CSS class name
+ */
+
+
+function removeClass(element, className) {
+  if (element.classList) {
+    element.classList.remove(className);
+  } else if (typeof element.className === 'string') {
+    element.className = replaceClassName(element.className, className);
+  } else {
+    element.setAttribute('class', replaceClassName(element.className && element.className.baseVal || '', className));
+  }
+}
+;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/BootstrapModalManager.js
+
+
+
+
+
+const Selector = {
+  FIXED_CONTENT: '.fixed-top, .fixed-bottom, .is-fixed, .sticky-top',
+  STICKY_CONTENT: '.sticky-top',
+  NAVBAR_TOGGLER: '.navbar-toggler'
+};
+
+class BootstrapModalManager extends esm_ModalManager {
+  adjustAndStore(prop, element, adjust) {
+    const actual = element.style[prop]; // TODO: DOMStringMap and CSSStyleDeclaration aren't strictly compatible
+    // @ts-ignore
+
+    element.dataset[prop] = actual;
+    css(element, {
+      [prop]: `${parseFloat(css(element, prop)) + adjust}px`
+    });
+  }
+
+  restore(prop, element) {
+    const value = element.dataset[prop];
+
+    if (value !== undefined) {
+      delete element.dataset[prop];
+      css(element, {
+        [prop]: value
+      });
+    }
+  }
+
+  setContainerStyle(containerState) {
+    super.setContainerStyle(containerState);
+    const container = this.getElement();
+    addClass(container, 'modal-open');
+    if (!containerState.scrollBarWidth) return;
+    const paddingProp = this.isRTL ? 'paddingLeft' : 'paddingRight';
+    const marginProp = this.isRTL ? 'marginLeft' : 'marginRight';
+    qsa(container, Selector.FIXED_CONTENT).forEach(el => this.adjustAndStore(paddingProp, el, containerState.scrollBarWidth));
+    qsa(container, Selector.STICKY_CONTENT).forEach(el => this.adjustAndStore(marginProp, el, -containerState.scrollBarWidth));
+    qsa(container, Selector.NAVBAR_TOGGLER).forEach(el => this.adjustAndStore(marginProp, el, containerState.scrollBarWidth));
+  }
+
+  removeContainerStyle(containerState) {
+    super.removeContainerStyle(containerState);
+    const container = this.getElement();
+    removeClass(container, 'modal-open');
+    const paddingProp = this.isRTL ? 'paddingLeft' : 'paddingRight';
+    const marginProp = this.isRTL ? 'marginLeft' : 'marginRight';
+    qsa(container, Selector.FIXED_CONTENT).forEach(el => this.restore(paddingProp, el));
+    qsa(container, Selector.STICKY_CONTENT).forEach(el => this.restore(marginProp, el));
+    qsa(container, Selector.NAVBAR_TOGGLER).forEach(el => this.restore(marginProp, el));
+  }
+
+}
+
+let sharedManager;
+function getSharedManager(options) {
+  if (!sharedManager) sharedManager = new BootstrapModalManager(options);
+  return sharedManager;
+}
+/* harmony default export */ const esm_BootstrapModalManager = ((/* unused pure expression or super */ null && (BootstrapModalManager)));
 ;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/ModalBody.js
 
 /* harmony default export */ const ModalBody = (createWithBsPrefix('modal-body'));
@@ -81988,39 +83203,6 @@ ModalDialog.displayName = 'ModalDialog';
 ;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/ModalFooter.js
 
 /* harmony default export */ const ModalFooter = (createWithBsPrefix('modal-footer'));
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/CloseButton.js
-
-
-
-
-const CloseButton_propTypes = {
-  'aria-label': (prop_types_default()).string,
-  onClick: (prop_types_default()).func,
-
-  /**
-   * Render different color variant for the button.
-   *
-   * Omitting this will render the default dark color.
-   */
-  variant: prop_types_default().oneOf(['white'])
-};
-const CloseButton_defaultProps = {
-  'aria-label': 'Close'
-};
-const CloseButton = /*#__PURE__*/react.forwardRef(({
-  className,
-  variant,
-  ...props
-}, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)("button", {
-  ref: ref,
-  type: "button",
-  className: classnames_default()('btn-close', variant && `btn-close-${variant}`, className),
-  ...props
-}));
-CloseButton.displayName = 'CloseButton';
-CloseButton.propTypes = CloseButton_propTypes;
-CloseButton.defaultProps = CloseButton_defaultProps;
-/* harmony default export */ const esm_CloseButton = (CloseButton);
 ;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/AbstractModalHeader.js
 
 
@@ -82042,7 +83224,7 @@ const AbstractModalHeader = /*#__PURE__*/react.forwardRef(({
   ...props
 }, ref) => {
   const context = (0,react.useContext)(esm_ModalContext);
-  const handleClick = useEventCallback(() => {
+  const handleClick = useEventCallback_useEventCallback(() => {
     context == null ? void 0 : context.onHide();
     onHide == null ? void 0 : onHide();
   });
@@ -82083,20 +83265,12 @@ const ModalHeader = /*#__PURE__*/react.forwardRef(({
 ModalHeader.displayName = 'ModalHeader';
 ModalHeader.defaultProps = ModalHeader_defaultProps;
 /* harmony default export */ const esm_ModalHeader = (ModalHeader);
-;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/divWithClassName.js
-
-
-
-/* harmony default export */ const divWithClassName = (className => /*#__PURE__*/react.forwardRef((p, ref) => /*#__PURE__*/(0,jsx_runtime.jsx)("div", { ...p,
-  ref: ref,
-  className: classnames_default()(p.className, className)
-})));
 ;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/ModalTitle.js
 
 
-const DivStyledAsH4 = divWithClassName('h4');
+const ModalTitle_DivStyledAsH4 = divWithClassName('h4');
 /* harmony default export */ const ModalTitle = (createWithBsPrefix('modal-title', {
-  Component: DivStyledAsH4
+  Component: ModalTitle_DivStyledAsH4
 }));
 ;// CONCATENATED MODULE: ./node_modules/react-bootstrap/esm/Modal.js
 
@@ -82191,7 +83365,7 @@ const Modal_Modal = /*#__PURE__*/react.forwardRef(({
   const removeStaticModalAnimationRef = (0,react.useRef)(null);
   const [modal, setModalRef] = useCallbackRef();
   const mergedRef = esm_useMergedRefs(ref, setModalRef);
-  const handleHide = useEventCallback(onHide);
+  const handleHide = useEventCallback_useEventCallback(onHide);
   const isRTL = useIsRTL();
   bsPrefix = useBootstrapPrefix(bsPrefix, 'modal');
   const modalContext = (0,react.useMemo)(() => ({
@@ -82215,7 +83389,7 @@ const Modal_Modal = /*#__PURE__*/react.forwardRef(({
     });
   }
 
-  const handleWindowResize = useEventCallback(() => {
+  const handleWindowResize = useEventCallback_useEventCallback(() => {
     if (modal) {
       updateDialogStyle(modal.dialog);
     }
@@ -82441,6 +83615,7 @@ var update = injectStylesIntoStyleTag_default()(bootstrap_min/* default */.Z, bo
 
 
 
+
 let nextNumber = 1;
 function nextUniqueKey() {
     return `${nextNumber++}`;
@@ -82484,18 +83659,18 @@ const folderItemIsLoading = [{
             return [];
         },
     }];
-const entryItemIsNull = [{
-        key: "null",
-        display: "(The folder is not selected)",
-        entry: null,
-        messageClass: "",
-    }];
-const entryItemIsEmpty = [{
-        key: "noOne",
-        display: "(This folder has no good item to show)",
-        entry: null,
-        messageClass: "",
-    }];
+const entryItemIsNull = {
+    entryItemIsNull: true,
+    items: []
+};
+const entryItemIsEmpty = {
+    entryItemIsEmpty: true,
+    items: []
+};
+const entryItemIsLoading = {
+    entryItemIsLoading: true,
+    items: []
+};
 const ansiEncodingList = ["utf8", "ascii", "latin1", "armscii8", "big5hkscs", "cp437", "cp737", "cp775", "cp850",
     "cp852", "cp855", "cp856", "cp858", "cp860", "cp861", "cp862", "cp863", "cp864", "cp865", "cp866", "cp869",
     "cp922", "cp932", "cp936", "cp949", "cp950", "cp1046", "cp1124", "cp1125", "cp1129", "cp1133", "cp1161",
@@ -82512,6 +83687,8 @@ function PSTApp() {
     const entriesSubject = new BehaviorSubject(entryItemIsNull);
     const previewTextSubject = new BehaviorSubject("");
     const ansiEncodingSubject = new BehaviorSubject("");
+    const diskAccessSubject = new BehaviorSubject("not yet");
+    const bytePositionFormatter = new Intl.NumberFormat('en-US');
     function onChange(input) {
         (input.files?.length === 1) ? fileSubject.next(input.files[0]) : fileSubject.next(null);
     }
@@ -82526,9 +83703,10 @@ function PSTApp() {
         try {
             const pst = await (0,dist/* openPst */.NU)({
                 readFile: async (buffer, offset, length, position) => {
+                    diskAccessSubject.next(`reading block at ${bytePositionFormatter.format(position)}`);
                     const blockBlob = file.slice(position, position + length);
                     const source = await blockBlob.arrayBuffer();
-                    new Uint8Array(buffer).set(new Uint8Array(source));
+                    new Uint8Array(buffer).set(new Uint8Array(source), offset);
                     return blockBlob.size;
                 },
                 close: async () => {
@@ -82587,18 +83765,29 @@ function PSTApp() {
                 entriesSubject.next(entryItemIsNull);
                 return;
             }
-            const hits = await folders[index].entryItemsProvider();
-            entriesSubject.next((hits.length !== 0) ? hits : entryItemIsEmpty);
+            entriesSubject.next(entryItemIsLoading);
+            try {
+                const hits = await folders[index].entryItemsProvider();
+                entriesSubject.next((hits.length !== 0) ? { items: hits } : entryItemIsEmpty);
+            }
+            catch (ex) {
+                entriesSubject.next({
+                    entryItemIsError: true,
+                    errorMessage: `${ex}`,
+                    items: [],
+                });
+                previewTextSubject.next(`${ex}`);
+            }
         }
         return ((0,jsx_runtime.jsx)(esm_Form.Select, { onChange: e => folderOnChange(e.target.selectedIndex), children: folders.map(folder => (0,jsx_runtime.jsx)("option", { children: folder.display }, folder.key)) }));
     }
     function EntriesList() {
-        const [entries, setEntries] = (0,react.useState)([]);
+        const [store, setStore] = (0,react.useState)(entryItemIsNull);
         (0,react.useEffect)(() => {
-            const subscription = entriesSubject.subscribe(value => setEntries(value));
+            const subscription = entriesSubject.subscribe(value => setStore(value));
             return () => subscription.unsubscribe();
         }, [entriesSubject]);
-        return ((0,jsx_runtime.jsx)(esm_ListGroup, { children: entries.map(entry => (0,jsx_runtime.jsx)(esm_ListGroup.Item, { action: entry.entry !== null, onClick: () => entry.entry && entryOnClick(toItemIsConvertable(entry)), children: entry.display }, entry.key)) }));
+        return ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [store.entryItemIsNull && (0,jsx_runtime.jsx)(esm_Alert, { variant: "info", children: "The folder is not selected yet" }, "null"), store.entryItemIsEmpty && (0,jsx_runtime.jsx)(esm_Alert, { variant: "info", children: "The selected folder seems not to have good item to show" }, "empty"), store.entryItemIsLoading && (0,jsx_runtime.jsx)(esm_Alert, { variant: "info", children: "\u23F3 Listing items in this folder" }, "empty"), store.entryItemIsError && (0,jsx_runtime.jsxs)(esm_Alert, { variant: "warning", children: ["There is an error encountered while listing items in this folder", (0,jsx_runtime.jsx)("br", {}), (0,jsx_runtime.jsx)("br", {}), (0,jsx_runtime.jsx)("pre", { children: store.errorMessage })] }, "empty"), (0,jsx_runtime.jsx)(esm_ListGroup, { children: store.items.map(entry => (0,jsx_runtime.jsx)(esm_ListGroup.Item, { action: entry.entry !== null, onClick: () => entry.entry && entryOnClick(toItemIsConvertable(entry)), children: entry.display }, entry.key)) })] }));
     }
     function PreviewModal() {
         const [previewText, setPreviewText] = (0,react.useState)("");
@@ -82612,12 +83801,7 @@ function PSTApp() {
         const [count, setCount] = (0,react.useState)(0);
         (0,react.useEffect)(() => {
             const subscription = entriesSubject.subscribe(value => {
-                if (value === entryItemIsEmpty || value === entryItemIsNull) {
-                    setCount(0);
-                }
-                else {
-                    setCount(value.length);
-                }
+                setCount(value.items.length);
             });
             return () => subscription.unsubscribe();
         });
@@ -82636,12 +83820,7 @@ function PSTApp() {
         const [wip, setWip] = (0,react.useState)(false);
         (0,react.useEffect)(() => {
             const subscription = entriesSubject.subscribe(value => {
-                if (value === entryItemIsEmpty || value === entryItemIsNull) {
-                    setList([]);
-                }
-                else {
-                    setList(value.map(toItemIsConvertable));
-                }
+                setList(value.items.map(toItemIsConvertable));
             });
             return () => subscription.unsubscribe();
         }, [entriesSubject]);
@@ -82678,7 +83857,17 @@ function PSTApp() {
                     : (0,jsx_runtime.jsxs)(react_bootstrap_esm_Button, { variant: "outline-primary", onClick: () => downloadAll(), children: ["Download ", count, " items"] }) }));
         }
     }
-    return (0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("h1", { children: "pst_to_eml demo" }), (0,jsx_runtime.jsxs)(esm_Form.Group, { className: "mb-3", controlId: 'selectPstFile', children: [(0,jsx_runtime.jsx)(esm_Form.Label, { children: "Select PST file" }), (0,jsx_runtime.jsx)(esm_Form.Control, { type: "file", onChange: e => onChange(e.target) })] }), (0,jsx_runtime.jsxs)(esm_Form.Group, { className: "mb-3", controlId: 'selectAnsiEncoding', children: [(0,jsx_runtime.jsx)(esm_Form.Label, { children: "Select ansi encoding" }), (0,jsx_runtime.jsx)(esm_Form.Control, { placeholder: "e.g. windows1251", onChange: e => ansiEncodingSubject.next(e.target.value), list: 'ansiEncodingList' }), (0,jsx_runtime.jsx)("datalist", { id: "ansiEncodingList", children: ansiEncodingList.map(name => (0,jsx_runtime.jsx)("option", { value: name }, name)) })] }), (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(react_bootstrap_esm_Button, { onClick: () => openUserPst(), children: "Open" }) }), (0,jsx_runtime.jsxs)("p", { children: ["Folder:", (0,jsx_runtime.jsx)("br", {})] }), (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(FolderSelector, {}) }), (0,jsx_runtime.jsxs)("p", { children: ["Folder actions:", (0,jsx_runtime.jsx)("br", {}), (0,jsx_runtime.jsx)(Downloader, {})] }), (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(ItemsCount, {}) }), (0,jsx_runtime.jsx)(EntriesList, {}), (0,jsx_runtime.jsx)(PreviewModal, {})] });
+    function DiskAccess() {
+        const [status, setStatus] = (0,react.useState)("");
+        (0,react.useEffect)(() => {
+            const subscription = diskAccessSubject
+                .pipe(throttleTime(333))
+                .subscribe(setStatus);
+            return () => subscription.unsubscribe();
+        }, [diskAccessSubject]);
+        return (0,jsx_runtime.jsx)(jsx_runtime.Fragment, { children: status });
+    }
+    return (0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("h1", { children: "pst_to_eml demo" }), (0,jsx_runtime.jsxs)(esm_Form.Group, { className: "mb-3", controlId: 'selectPstFile', children: [(0,jsx_runtime.jsx)(esm_Form.Label, { children: "Select PST file" }), (0,jsx_runtime.jsx)(esm_Form.Control, { type: "file", onChange: e => onChange(e.target) })] }), (0,jsx_runtime.jsxs)(esm_Form.Group, { className: "mb-3", controlId: 'selectAnsiEncoding', children: [(0,jsx_runtime.jsx)(esm_Form.Label, { children: "Select ansi encoding" }), (0,jsx_runtime.jsx)(esm_Form.Control, { placeholder: "e.g. windows1251", onChange: e => ansiEncodingSubject.next(e.target.value), list: 'ansiEncodingList' }), (0,jsx_runtime.jsx)("datalist", { id: "ansiEncodingList", children: ansiEncodingList.map(name => (0,jsx_runtime.jsx)("option", { value: name }, name)) })] }), (0,jsx_runtime.jsxs)("p", { children: [(0,jsx_runtime.jsx)(react_bootstrap_esm_Button, { onClick: () => openUserPst(), children: "Open" }), "\u00A0\u00A0\u00A0", (0,jsx_runtime.jsxs)("i", { children: ["Last disk access: ", (0,jsx_runtime.jsx)(DiskAccess, {})] })] }), (0,jsx_runtime.jsxs)("p", { children: ["Folder:", (0,jsx_runtime.jsx)("br", {})] }), (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(FolderSelector, {}) }), (0,jsx_runtime.jsxs)("p", { children: ["Folder actions:", (0,jsx_runtime.jsx)("br", {}), (0,jsx_runtime.jsx)(Downloader, {})] }), (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(ItemsCount, {}) }), (0,jsx_runtime.jsx)(EntriesList, {}), (0,jsx_runtime.jsx)(PreviewModal, {})] });
 }
 react_dom.render((0,jsx_runtime.jsx)(esm_Container, { children: (0,jsx_runtime.jsx)(PSTApp, {}) }), document.getElementById('root'));
 
