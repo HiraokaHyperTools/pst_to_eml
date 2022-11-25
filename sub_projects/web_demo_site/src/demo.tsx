@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState, } from 'react';
 import ReactDOM from 'react-dom';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, throttleTime } from 'rxjs';
 import Container from 'react-bootstrap/Container';
 import Button from 'react-bootstrap/Button';
-import ButtonGroup from 'react-bootstrap/ButtonGroup';
+import Alert from 'react-bootstrap/Alert';
 import Form from 'react-bootstrap/Form';
 import ListGroup from 'react-bootstrap/ListGroup';
 import Modal from 'react-bootstrap/Modal';
@@ -16,6 +16,15 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 let nextNumber = 1;
 function nextUniqueKey(): string {
   return `${nextNumber++}`;
+}
+
+interface EntryItemStore {
+  entryItemIsNull?: boolean;
+  entryItemIsEmpty?: boolean;
+  entryItemIsLoading?: boolean;
+  entryItemIsError?: boolean;
+  errorMessage?: string;
+  items: EntryItem[];
 }
 
 interface EntryItem {
@@ -79,19 +88,20 @@ const folderItemIsLoading: FolderItem[] = [{
   },
 }];
 
-const entryItemIsNull: EntryItem[] = [{
-  key: "null",
-  display: "(The folder is not selected)",
-  entry: null,
-  messageClass: "",
-}];
+const entryItemIsNull: EntryItemStore = {
+  entryItemIsNull: true,
+  items: []
+};
 
-const entryItemIsEmpty: EntryItem[] = [{
-  key: "noOne",
-  display: "(This folder has no good item to show)",
-  entry: null,
-  messageClass: "",
-}];
+const entryItemIsEmpty: EntryItemStore = {
+  entryItemIsEmpty: true,
+  items: []
+};
+
+const entryItemIsLoading: EntryItemStore = {
+  entryItemIsLoading: true,
+  items: []
+};
 
 const ansiEncodingList = ["utf8", "ascii", "latin1", "armscii8", "big5hkscs", "cp437", "cp737", "cp775", "cp850",
   "cp852", "cp855", "cp856", "cp858", "cp860", "cp861", "cp862", "cp863", "cp864", "cp865", "cp866", "cp869",
@@ -107,9 +117,12 @@ const ansiEncodingList = ["utf8", "ascii", "latin1", "armscii8", "big5hkscs", "c
 function PSTApp() {
   const fileSubject = new BehaviorSubject<File | null>(null);
   const foldersSubject = new BehaviorSubject<FolderItem[]>(folderItemIsNull);
-  const entriesSubject = new BehaviorSubject<EntryItem[]>(entryItemIsNull);
+  const entriesSubject = new BehaviorSubject<EntryItemStore>(entryItemIsNull);
   const previewTextSubject = new BehaviorSubject("");
   const ansiEncodingSubject = new BehaviorSubject("");
+  const diskAccessSubject = new BehaviorSubject("not yet");
+
+  const bytePositionFormatter = new Intl.NumberFormat('en-US');
 
   function onChange(input: HTMLInputElement) {
     (input.files?.length === 1) ? fileSubject.next(input.files[0]) : fileSubject.next(null);
@@ -126,9 +139,10 @@ function PSTApp() {
     try {
       const pst = await openPst({
         readFile: async (buffer: ArrayBuffer, offset: number, length: number, position: number) => {
+          diskAccessSubject.next(`reading block at ${bytePositionFormatter.format(position)}`);
           const blockBlob = file.slice(position, position + length);
           const source = await blockBlob.arrayBuffer();
-          new Uint8Array(buffer).set(new Uint8Array(source));
+          new Uint8Array(buffer).set(new Uint8Array(source), offset);
           return blockBlob.size;
         },
         close: async () => {
@@ -199,8 +213,19 @@ function PSTApp() {
         entriesSubject.next(entryItemIsNull);
         return;
       }
-      const hits = await folders[index].entryItemsProvider();
-      entriesSubject.next((hits.length !== 0) ? hits : entryItemIsEmpty);
+      entriesSubject.next(entryItemIsLoading);
+      try {
+        const hits = await folders[index].entryItemsProvider();
+        entriesSubject.next((hits.length !== 0) ? { items: hits } : entryItemIsEmpty);
+      }
+      catch (ex) {
+        entriesSubject.next({
+          entryItemIsError: true,
+          errorMessage: `${ex}`,
+          items: [],
+        });
+        previewTextSubject.next(`${ex}`);
+      }
     }
 
     return (
@@ -211,12 +236,12 @@ function PSTApp() {
   }
 
   function EntriesList() {
-    const [entries, setEntries] = useState<EntryItem[]>([]);
+    const [store, setStore] = useState<EntryItemStore>(entryItemIsNull);
 
     useEffect(
       () => {
         const subscription = entriesSubject.subscribe(
-          value => setEntries(value)
+          value => setStore(value)
         );
         return () => subscription.unsubscribe();
       },
@@ -224,13 +249,19 @@ function PSTApp() {
     );
 
     return (
-      <ListGroup>
-        {entries.map(entry =>
-          <ListGroup.Item action={entry.entry !== null} key={entry.key} onClick={() => entry.entry && entryOnClick(toItemIsConvertable(entry))}>
-            {entry.display}
-          </ListGroup.Item>
-        )}
-      </ListGroup>
+      <>
+        {store.entryItemIsNull && <Alert key="null" variant="info">The folder is not selected yet</Alert>}
+        {store.entryItemIsEmpty && <Alert key="empty" variant="info">The selected folder seems not to have good item to show</Alert>}
+        {store.entryItemIsLoading && <Alert key="empty" variant="info">⏳ Listing items in this folder</Alert>}
+        {store.entryItemIsError && <Alert key="empty" variant="warning">There is an error encountered while listing items in this folder<br /><br /><pre>{store.errorMessage}</pre></Alert>}
+        <ListGroup>
+          {store.items.map(entry =>
+            <ListGroup.Item action={entry.entry !== null} key={entry.key} onClick={() => entry.entry && entryOnClick(toItemIsConvertable(entry))}>
+              {entry.display}
+            </ListGroup.Item>
+          )}
+        </ListGroup>
+      </>
     );
   }
 
@@ -265,12 +296,7 @@ function PSTApp() {
       () => {
         const subscription = entriesSubject.subscribe(
           value => {
-            if (value === entryItemIsEmpty || value === entryItemIsNull) {
-              setCount(0);
-            }
-            else {
-              setCount(value.length);
-            }
+            setCount(value.items.length);
           }
         );
         return () => subscription.unsubscribe();
@@ -296,12 +322,7 @@ function PSTApp() {
       () => {
         const subscription = entriesSubject.subscribe(
           value => {
-            if (value === entryItemIsEmpty || value === entryItemIsNull) {
-              setList([]);
-            }
-            else {
-              setList(value.map(toItemIsConvertable));
-            }
+            setList(value.items.map(toItemIsConvertable));
           }
         );
         return () => subscription.unsubscribe();
@@ -355,6 +376,22 @@ function PSTApp() {
     }
   }
 
+  function DiskAccess() {
+    const [status, setStatus] = useState("");
+
+    useEffect(
+      () => {
+        const subscription = diskAccessSubject
+          .pipe(throttleTime(333))
+          .subscribe(setStatus);
+        return () => subscription.unsubscribe();
+      },
+      [diskAccessSubject]
+    );
+
+    return <>{status}</>;
+  }
+
   return <>
     <h1>pst_to_eml demo</h1>
     <Form.Group className="mb-3" controlId='selectPstFile'>
@@ -369,7 +406,7 @@ function PSTApp() {
         {ansiEncodingList.map(name => <option key={name} value={name}></option>)}
       </datalist>
     </Form.Group>
-    <p><Button onClick={() => openUserPst()}>Open</Button></p>
+    <p><Button onClick={() => openUserPst()}>Open</Button>&nbsp;&nbsp;&nbsp;<i>Last disk access: <DiskAccess /></i></p>
     <p>Folder:<br /></p>
     <p>
       <FolderSelector />
