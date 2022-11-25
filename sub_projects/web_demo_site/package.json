@@ -8,7 +8,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.1",
+    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.2",
     "@hiraokahypertools/pst_to_eml": "../..",
     "@kenjiuno/decompressrtf": "^0.1.4",
     "@kenjiuno/msgreader": "^1.15.0-alpha.1",
