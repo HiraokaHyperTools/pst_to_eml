@@ -2,14 +2,10 @@
 # yarn lockfile v1
 
 
-"@hiraokahypertools/pst-extractor@../pst-extractor":
-  version "0.1.0-alpha.3"
-  dependencies:
-    iconv-lite "^0.6.3"
-    long "^5.2.0"
-
-"@hiraokahypertools/pst-extractor@file:../pst-extractor":
-  version "0.1.0-alpha.3"
+"@hiraokahypertools/pst-extractor@^0.1.0-alpha.4":
+  version "0.1.0-alpha.4"
+  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst-extractor/-/pst-extractor-0.1.0-alpha.4.tgz#aef02384f6004596358ffedcf8caa581f73ae932"
+  integrity sha512-gxcXJBXMtHqxgVIiL4M443KQpE6AXWYr58fL/YV4E6bs/0xChFwpxiqcQASuV1iOSbAtMpC/iZ53nRLgca2FVw==
   dependencies:
     iconv-lite "^0.6.3"
     long "^5.2.0"
@@ -457,6 +453,15 @@ picomatch@^2.0.4, picomatch@^2.2.1:
   resolved "https://registry.npmjs.org/picomatch/-/picomatch-2.3.1.tgz"
   integrity sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA==
 
+pst-extractor@^1.9.0:
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/pst-extractor/-/pst-extractor-1.9.0.tgz#ca95aaa72153a97d55764958e54b8dc55c39cc5e"
+  integrity sha512-XcRCSJ/jWmN3STXpASsH9ljtuL/MbwWB4j21hmD9XFdg+EdD80nZEAGog92FwHTaK1RPNS0PV2SXGaF6YU6Zrw==
+  dependencies:
+    iconv-lite "^0.6.3"
+    long "^5.2.0"
+    uuid-parse "^1.1.0"
+
 randombytes@^2.1.0:
   version "2.1.0"
   resolved "https://registry.npmjs.org/randombytes/-/randombytes-2.1.0.tgz"
@@ -558,6 +563,11 @@ typescript@^4.7.4:
   version "4.7.4"
   resolved "https://registry.npmjs.org/typescript/-/typescript-4.7.4.tgz"
   integrity sha512-C0WQT0gezHuw6AdY1M2jxUO83Rjf0HP7Sk1DtXj6j1EwkQNZrHAg2XPWlq62oqEhYvONq5pkC2Y9oPljWToLmQ==
+
+uuid-parse@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/uuid-parse/-/uuid-parse-1.1.0.tgz#7061c5a1384ae0e1f943c538094597e1b5f3a65b"
+  integrity sha512-OdmXxA8rDsQ7YpNVbKSJkNzTw2I+S5WsbMDnCtIWSQaosNAcWtFuI/YK1TjzUI6nbkgiqEyh8gWngfcv8Asd9A==
 
 vscode-oniguruma@^1.6.1:
   version "1.6.2"
