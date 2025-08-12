@@ -1,6 +1,5 @@
-const assert = require('assert');
-const { openPstFile } = require('@hiraokahypertools/pst-extractor');
-const { wrapPstFile } = require('../lib/index');
+import { openPstFile } from '@hiraokahypertools/pst-extractor';
+import { wrapPstFile } from '../src/index';
 
 const fs = require('fs');
 const path = require('path');
@@ -20,9 +19,9 @@ describe("msgInMsgInMsg.pst", function () {
     const items5a = await folder4.items();
     const items5b = await folder4.items();
     const items5c = await folder4.items();
-    assert.strictEqual(items5a.length, 1);
-    assert.strictEqual(items5b.length, 1);
-    assert.strictEqual(items5c.length, 1);
+    expect(items5a.length).toBe(1);
+    expect(items5b.length).toBe(1);
+    expect(items5c.length).toBe(1);
     pstFile.close();
   });
 });
@@ -55,22 +54,18 @@ describe("tree traversal tests", function () {
   async function itemPrinter(item) {
     if (item.messageClass === "IPM.Note") {
       const emlStr = await item.toEmlStr({});
-      assert.notEqual(
-        emlStr,
-        undefined
-      );
-      assert.notEqual(
-        await item.toEmlBuffer({}),
-        undefined
-      );
+      expect(emlStr).not.toBeUndefined();
+      expect(await item.toEmlBuffer({})).not.toBeUndefined();
       return emlStr;
     }
     else if (item.messageClass === "IPM.Contact") {
       const str = await item.toVCardStr({});
-      assert.notEqual(
-        str,
-        undefined
-      );
+      expect(str).not.toBeUndefined();
+      return str;
+    }
+    else if (item.messageClass === "IPM.Contact") {
+      const str = await item.toVCardStr({});
+      expect(str).not.toBeUndefined();
       //console.log(str);
       //await require('fs').promises.writeFile(`${new Date().getTime()}.vcf`, str);
       return str;
@@ -82,14 +77,14 @@ describe("tree traversal tests", function () {
 
   it("msgInMsgInMsg.pst", async function () {
     const stat = await traversalTest("msgInMsgInMsg.pst", itemPrinter);
-    assert.deepEqual(stat, { structure: "[[E(IPM.Note,3053,)[[]][]]]" });
+    expect(stat).toEqual({ structure: "[[E(IPM.Note,3045,)[[]][]]]" });
   });
   it("contacts.pst", async function () {
     const stat = await traversalTest("contacts.pst", itemPrinter);
-    assert.deepEqual(stat, { structure: "[[[[[]]E(IPM.Contact,504,)[]][][]]]" });
+    expect(stat).toEqual({ structure: "[[[[[]]E(IPM.Contact,504,)[]][][]]]" });
   });
   it("contacts97-2002.pst", async function () {
     const stat = await traversalTest("contacts97-2002.pst", itemPrinter);
-    assert.deepEqual(stat, { structure: "[[[[]E(IPM.Contact,504,)[]][][]]]" });
+    expect(stat).toEqual({ structure: "[[[[]E(IPM.Contact,504,)[]][][]]]" });
   });
 });

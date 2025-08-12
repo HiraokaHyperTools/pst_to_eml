@@ -1,4 +1,4 @@
-import path from 'path';
+import * as path from 'node:path';
 
 /**
  * 
@@ -48,7 +48,7 @@ export function convertToBuffer(attachmentStream: ArrayBuffer | undefined): Buff
  * 
  * @internal
  */
- export function formatAddress(name: string, email: string): string | null {
+export function formatAddress(name: string, email: string): string | null {
   if (name) {
     return `${email} <${name}>`;
   }

@@ -1,4 +1,8 @@
 
+/**
+ * 
+ * @internal
+ */
 export function convertVLines(vLines: [string | string[], string | string[]][]): string {
   function toText(vCell: string[] | string): string {
     return Array.isArray(vCell)
