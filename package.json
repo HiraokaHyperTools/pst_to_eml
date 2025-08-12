@@ -1,6 +1,6 @@
 {
   "name": "@hiraokahypertools/pst_to_eml",
-  "version": "0.1.0-alpha.9",
+  "version": "0.1.0-alpha.10",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "author": "kenjiuno",
@@ -36,7 +36,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "rimraf dist",
-    "prepublishOnly": "npm run clean && npm run build",
+    "prepublishOnly": "npm run test && npm run clean && npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
