@@ -1,7 +1,7 @@
 import { PSTContact, PSTMessage, PSTRecipient } from '@hiraokahypertools/pst-extractor';
 import { PSTFile } from '@hiraokahypertools/pst-extractor';
 import { PSTFolder } from '@hiraokahypertools/pst-extractor';
-import * as MailComposer from 'nodemailer/lib/mail-composer';
+import MailComposer from 'nodemailer/lib/mail-composer';
 import { applyFallbackRecipients, changeFileExtension, convertToBuffer, formatAddress, formatFrom } from './utils';
 import { convertVLines } from './vLines';
 import { FasterEmail } from '@hiraokahypertools/pst-extractor/dist/FasterEmail';
