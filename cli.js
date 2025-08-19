@@ -9,6 +9,10 @@ function safety(name) {
   return name.replace(/[\"/\\\\\\?<>\\*:\\|]/g, "_");
 }
 
+function escapeLeadingFrom(eml) {
+  return eml.replace(/^([>]*)From([\s])/gm, ">$1From$2");
+}
+
 program
   .command('tree <pstFilePath>')
   .description('Print items tree inside pst file')
@@ -136,7 +140,7 @@ program
                   if (item.messageClass === "IPM.Note" || item.messageClass.indexOf("IPM.Document.") === 0) {
                     const emlStr = await item.toEmlStr({});
                     await mbox.write(`From - _${((new Date()).getTime())}\r\nX-Mozilla-Status: 0001\r\nX-Mozilla-Status2: 00000000\r\nX-Mozilla-Keys:                                                                                 \r\n`);
-                    await mbox.write(emlStr);
+                    await mbox.write(escapeLeadingFrom(emlStr));
                     await mbox.write("\r\n");
                   }
                 }
