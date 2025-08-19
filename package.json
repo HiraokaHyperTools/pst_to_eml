@@ -1,6 +1,6 @@
 {
   "name": "@hiraokahypertools/pst_to_eml",
-  "version": "0.1.0-alpha.12",
+  "version": "0.1.0-alpha.13",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "author": "kenjiuno",
@@ -21,7 +21,7 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.20",
+    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.22",
     "commander": "^9.4.0",
     "iconv-lite": "^0.6.3",
     "nodemailer": "^7.0.5"
