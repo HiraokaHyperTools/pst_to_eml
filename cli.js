@@ -114,7 +114,7 @@ function createUndup() {
 
 program
   .command('export-mbox <pstFilePath> <saveToDir>')
-  .description('export items inside pst file to mbox format')
+  .description('export items inside pst file to Thunderbird mbox format')
   .option('--ansi-encoding <encoding>', 'Set ANSI encoding (used by iconv-lite) for non Unicode text in msg file')
   .action(async (pstFilePath, saveToDir, options) => {
     try {
@@ -125,35 +125,51 @@ program
           return path.join(one, two);
         }
 
-        async function walk(node, depth, saveToDir) {
-          console.log("walk", saveToDir);
+        async function convert(subFolder, saveTo) {
+          console.log("convert", saveTo);
+          const mbox = await fs.promises.open(saveTo, 'w');
+          try {
+            for (let item of (await subFolder.items())) {
+              if (item.messageClass === "IPM.Note" || item.messageClass.indexOf("IPM.Document.") === 0) {
+                const emlStr = await item.toEmlStr({});
+                await mbox.write(`From - _${((new Date()).getTime())}\r\nX-Mozilla-Status: 0001\r\nX-Mozilla-Status2: 00000000\r\nX-Mozilla-Keys:                                                                                 \r\n`);
+                await mbox.write(escapeLeadingFrom(emlStr));
+                await mbox.write("\r\n");
+              }
+            }
+          }
+          finally {
+            await mbox.close();
+          }
+        }
+
+        async function walk2(node, saveToDir) {
           await fs.promises.mkdir(saveToDir, { recursive: true });
 
           const undup = createUndup();
 
           for (let subFolder of (await node.subFolders())) {
             const displayName = undup.next(await subFolder.displayName());
-            {
-              const mbox = await fs.promises.open(safeJoin(saveToDir, safety(displayName)), 'w')
-              try {
-                for (let item of (await subFolder.items())) {
-                  if (item.messageClass === "IPM.Note" || item.messageClass.indexOf("IPM.Document.") === 0) {
-                    const emlStr = await item.toEmlStr({});
-                    await mbox.write(`From - _${((new Date()).getTime())}\r\nX-Mozilla-Status: 0001\r\nX-Mozilla-Status2: 00000000\r\nX-Mozilla-Keys:                                                                                 \r\n`);
-                    await mbox.write(escapeLeadingFrom(emlStr));
-                    await mbox.write("\r\n");
-                  }
-                }
-              }
-              finally {
-                await mbox.close();
-              }
-            }
-            await walk(subFolder, depth + 1, safeJoin(saveToDir, safety(displayName) + ".sbd"));
+            const saveTo = safeJoin(saveToDir, safety(displayName));
+            await convert(subFolder, saveTo);
+            await walk2(subFolder, saveTo + ".sbd");
           }
         }
 
-        await walk(pst, 0, path.normalize(saveToDir));
+        async function walk(folder, exportToBase) {
+          if (folder.primaryNodeId === 32802) {
+            await convert(folder, exportToBase);
+            await walk2(folder, exportToBase + ".sbd");
+          }
+          else {
+            for (let subFolder of (await folder.subFolders())) {
+              await walk(subFolder, exportToBase);
+            }
+          }
+        }
+
+        const exportToBase = safeJoin(path.normalize(saveToDir), path.basename(pstFilePath, path.extname(pstFilePath)));
+        await walk(pst, exportToBase);
       }
       finally {
         pst.close();

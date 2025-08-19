@@ -31,6 +31,8 @@ export interface IPItem extends IPNode {
    */
   get messageClass(): string;
 
+  get primaryNodeId(): number;
+
   /**
    * Assume this is a mail message and then convert to EML.
    * 
@@ -56,6 +58,7 @@ export interface IPItem extends IPNode {
 export interface IPFolder extends IPNode {
   subFolders(): Promise<PFolder[]>;
   items(options?: FolderItemsOptions): Promise<PItem[]>;
+  get primaryNodeId(): number;
 }
 
 export interface IPRoot extends IPFolder {
@@ -77,6 +80,14 @@ export class PRoot implements IPRoot {
     }
 
     return (await this.pstFile.getMessageStore()).displayName;
+  }
+
+  get primaryNodeId(): number {
+    if (this.closed) {
+      throw new Error("Trying to access disposed object.");
+    }
+
+    return 0;
   }
 
   async subFolders(): Promise<PFolder[]> {
@@ -120,6 +131,10 @@ export class PFolder implements IPFolder {
 
   async displayName(): Promise<string> {
     return this.folder.displayName;
+  }
+
+  get primaryNodeId(): number {
+    return this.folder.primaryNodeId;
   }
 
   async subFolders(): Promise<PFolder[]> {
@@ -174,6 +189,10 @@ export class PItem implements IPItem {
 
   async displayName(): Promise<string> {
     return this.faster.displayName;
+  }
+
+  get primaryNodeId(): number {
+    return this.faster.primaryNodeId;
   }
 
   constructor(email: FasterEmail) {
