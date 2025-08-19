@@ -46,7 +46,7 @@ program
   .option('--ansi-encoding <encoding>', 'Set ANSI encoding (used by iconv-lite) for non Unicode text in msg file')
   .action(async (pstFilePath, saveToDir, options) => {
     try {
-      const pstFile = await openPstFile(pstFilePath);
+      const pstFile = await openPstFile(pstFilePath, { ansiEncoding: options.ansiEncoding, });
       const pst = await wrapPstFile(pstFile);
       try {
         function safeJoin(one, two) {
@@ -75,7 +75,77 @@ program
           for (let subFolder of (await node.subFolders())) {
             const displayName = await subFolder.displayName();
             console.log(prefixTo("(f) " + displayName));
-            await walk(subFolder, depth + 1, safeJoin(saveToDir, displayName));
+            await walk(subFolder, depth + 1, safeJoin(saveToDir, safety(displayName)));
+          }
+        }
+
+        await walk(pst, 0, path.normalize(saveToDir));
+      }
+      finally {
+        pst.close();
+      }
+    } catch (ex) {
+      process.exitCode = 1;
+      console.error(ex);
+    }
+  });
+
+function createUndup() {
+  const map = new Map();
+  return {
+    next: (name) => {
+      if (!name) {
+        name = "Unnamed";
+      }
+      for (let x = 0; ; x++) {
+        const candidate = x === 0 ? name : `${name} (${x})`;
+        if (!map.has(candidate)) {
+          map.set(candidate, true);
+          return candidate;
+        }
+      }
+    }
+  }
+}
+
+program
+  .command('export-mbox <pstFilePath> <saveToDir>')
+  .description('export items inside pst file to mbox format')
+  .option('--ansi-encoding <encoding>', 'Set ANSI encoding (used by iconv-lite) for non Unicode text in msg file')
+  .action(async (pstFilePath, saveToDir, options) => {
+    try {
+      const pstFile = await openPstFile(pstFilePath, { ansiEncoding: options.ansiEncoding, });
+      const pst = await wrapPstFile(pstFile);
+      try {
+        function safeJoin(one, two) {
+          return path.join(one, two);
+        }
+
+        async function walk(node, depth, saveToDir) {
+          console.log("walk", saveToDir);
+          await fs.promises.mkdir(saveToDir, { recursive: true });
+
+          const undup = createUndup();
+
+          for (let subFolder of (await node.subFolders())) {
+            const displayName = undup.next(await subFolder.displayName());
+            {
+              const mbox = await fs.promises.open(safeJoin(saveToDir, safety(displayName)), 'w')
+              try {
+                for (let item of (await subFolder.items())) {
+                  if (item.messageClass === "IPM.Note" || item.messageClass.indexOf("IPM.Document.") === 0) {
+                    const emlStr = await item.toEmlStr({});
+                    await mbox.write(`From - _${((new Date()).getTime())}\r\nX-Mozilla-Status: 0001\r\nX-Mozilla-Status2: 00000000\r\nX-Mozilla-Keys:                                                                                 \r\n`);
+                    await mbox.write(emlStr);
+                    await mbox.write("\r\n");
+                  }
+                }
+              }
+              finally {
+                await mbox.close();
+              }
+            }
+            await walk(subFolder, depth + 1, safeJoin(saveToDir, safety(displayName) + ".sbd"));
           }
         }
 
