@@ -5,8 +5,9 @@ import MailComposer from 'nodemailer/lib/mail-composer';
 import { applyFallbackRecipients, changeFileExtension, convertToBuffer, formatAddress, formatFrom } from './utils';
 import { convertVLines } from './vLines';
 import { FasterEmail } from '@hiraokahypertools/pst-extractor/dist/FasterEmail';
-import { decode } from 'iconv-lite';
 import { Buffer } from 'buffer';
+
+const utf8Decoder = new TextDecoder('utf-8');
 
 export async function wrapPstFile(
   pstFile: PSTFile
@@ -215,7 +216,7 @@ export class PItem implements IPItem {
    */
   async toEmlStr(options: MsgConverterOptions): Promise<string> {
     const buffer = await this.toEmlBuffer(options);
-    return decode(Buffer.from(buffer), 'utf-8');
+    return utf8Decoder.decode(buffer);
   }
 
   /**
