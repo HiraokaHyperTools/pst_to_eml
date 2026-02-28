@@ -303,10 +303,10 @@
     "@shikijs/types" "^3.22.0"
     "@shikijs/vscode-textmate" "^10.0.2"
 
-"@hiraokahypertools/pst-extractor@^0.3.0-alpha.1":
-  version "0.3.0-alpha.1"
-  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst-extractor/-/pst-extractor-0.3.0-alpha.1.tgz#03ee2a950289fd0559f2de4131cbfb9a52877be4"
-  integrity sha512-eP79/UWuh+BbIo+BklWC7twq9D6WKGzPrn/4ZG9Ksq6aTlPG1Eump0TAuU0RxivnfT7AdCGll7p7/L/jYhF1BA==
+"@hiraokahypertools/pst-extractor@^0.5.0-alpha.1":
+  version "0.5.0-alpha.1"
+  resolved "https://registry.yarnpkg.com/@hiraokahypertools/pst-extractor/-/pst-extractor-0.5.0-alpha.1.tgz#f6dab777b5a22a7063a27703d34702745343884e"
+  integrity sha512-W5yDdnlsaTl78pOr4YYBewxbQkfh8tJl8HOvyFqg+CZFUWfRT/O/q4n8y8TysECSqjaSSNZq4kUKE3WBSTYAFA==
   dependencies:
     long "^5.3.2"
     pako "^2.1.0"

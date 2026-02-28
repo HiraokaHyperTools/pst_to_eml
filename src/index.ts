@@ -1,6 +1,4 @@
-import { PSTContact, PSTMessage, PSTRecipient } from '@hiraokahypertools/pst-extractor';
-import { PSTFile } from '@hiraokahypertools/pst-extractor';
-import { PSTFolder } from '@hiraokahypertools/pst-extractor';
+import type { IPSTContact, IPSTMessage, IPSTRecipient, IPSTFile, IPSTFolder } from '@hiraokahypertools/pst-extractor';
 import { applyFallbackRecipients, changeFileExtension, convertToUint8Array } from './utils.js';
 import { convertVLines } from './vLines.js';
 import { FasterEmail } from '@hiraokahypertools/pst-extractor';
@@ -18,11 +16,8 @@ interface AttachmentRefined {
 }
 
 export async function wrapPstFile(
-  pstFile: PSTFile
+  pstFile: IPSTFile
 ): Promise<PRoot> {
-  if (!(pstFile instanceof PSTFile)) {
-    console.warn("pstFile seems not to be instanceof PSTFile.");
-  }
   return new PRoot(pstFile);
 }
 
@@ -75,10 +70,10 @@ export interface IPRoot extends IPFolder {
 }
 
 export class PRoot implements IPRoot {
-  private pstFile: PSTFile;
+  private pstFile: IPSTFile;
   private closed: boolean;
 
-  constructor(pstFile: PSTFile) {
+  constructor(pstFile: IPSTFile) {
     this.pstFile = pstFile;
     this.closed = false;
   }
@@ -132,9 +127,9 @@ export interface FolderItemsOptions {
 }
 
 export class PFolder implements IPFolder {
-  private folder: PSTFolder;
+  private folder: IPSTFolder;
 
-  constructor(folder: PSTFolder) {
+  constructor(folder: IPSTFolder) {
     this.folder = folder;
   }
 
@@ -150,7 +145,7 @@ export class PFolder implements IPFolder {
     const list: PFolder[] = [];
 
     if (this.folder.hasSubfolders) {
-      const childFolders: PSTFolder[] = (await this.folder.getSubFolders());
+      const childFolders: IPSTFolder[] = (await this.folder.getSubFolders());
       for (let childFolder of childFolders) {
         list.push(new PFolder(childFolder));
       }
@@ -245,7 +240,7 @@ export class PItem implements IPItem {
     return await this.toEmlFrom(options, await this.faster.getMessage());
   }
 
-  private async toEmlFrom(options: MsgConverterOptions, email: PSTMessage): Promise<Uint8Array> {
+  private async toEmlFrom(options: MsgConverterOptions, email: IPSTMessage): Promise<Uint8Array> {
     return await toEmlFrom(options, email);
   }
 
@@ -257,11 +252,11 @@ export class PItem implements IPItem {
   async toVCardStr(options: MsgConverterOptions): Promise<string> {
     return (await this.toVCardStrFrom(
       options,
-      (await this.faster.getMessage()) as PSTContact
+      (await this.faster.getMessage()) as unknown as IPSTContact
     ));
   }
 
-  private async toVCardStrFrom(options: MsgConverterOptions, source: PSTContact): Promise<string> {
+  private async toVCardStrFrom(options: MsgConverterOptions, source: IPSTContact): Promise<string> {
     return await toVCardStrFrom(options, source);
   }
 }
@@ -273,7 +268,7 @@ export class PItem implements IPItem {
  * @param email The PST message to convert.
  * @returns The EML data.
  */
-export async function toEmlFrom(options: MsgConverterOptions, email: PSTMessage): Promise<Uint8Array> {
+export async function toEmlFrom(options: MsgConverterOptions, email: IPSTMessage): Promise<Uint8Array> {
   const eml = await toEmlStringFrom(options, email);
   return utf8Encoder.encode(eml);
 }
@@ -285,10 +280,10 @@ export async function toEmlFrom(options: MsgConverterOptions, email: PSTMessage)
  * @param email The PST message to convert.
  * @returns The EML data.
  */
-export async function toEmlStringFrom(options: MsgConverterOptions, email: PSTMessage): Promise<string> {
+export async function toEmlStringFrom(options: MsgConverterOptions, email: IPSTMessage): Promise<string> {
   const recipients = [];
   for (let x = 0; x < (await email.getNumberOfRecipients()); x++) {
-    const entry: PSTRecipient = (await email.getRecipient(x));
+    const entry: IPSTRecipient = (await email.getRecipient(x));
     recipients.push({
       name: entry.displayName,
       email: entry.emailAddress,
@@ -301,7 +296,7 @@ export async function toEmlStringFrom(options: MsgConverterOptions, email: PSTMe
   for (let x = 0; x < (await email.getNumberOfAttachments()); x++) {
     const attachment = (await email.getAttachment(x));
 
-    const embedded = (await attachment.getEmbeddedPSTMessage())
+    const embedded = (await attachment.getEmbeddedPSTMessage()) as IPSTMessage;
     const filename = [
       attachment.longFilename,
       attachment.filename,
@@ -468,7 +463,7 @@ export async function toEmlStringFrom(options: MsgConverterOptions, email: PSTMe
  * @param source The PST contact to convert.
  * @returns The vCard string.
  */
-export async function toVCardStrFrom(options: MsgConverterOptions, source: PSTContact): Promise<string> {
+export async function toVCardStrFrom(options: MsgConverterOptions, source: IPSTContact): Promise<string> {
   const makers = [
     {
       kind: "N",
