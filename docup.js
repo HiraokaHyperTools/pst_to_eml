@@ -1,8 +1,10 @@
 // for package maintenance: document auto updater.
 // usage: node docup.js
 
-const util = require('util');
-const exec = util.promisify(require('child_process').exec);
+import util from 'util';
+import child_process from 'child_process';
+
+const exec = util.promisify(child_process.exec);
 
 async function run() {
   await exec("yarn typedoc", {});
