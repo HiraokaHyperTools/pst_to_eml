@@ -1,0 +1,17 @@
+BEGIN:VCARD
+VERSION:2.1
+N:イグザンプル;コム;ドット;Mr.;殿
+FN:Mr. イグザンプル ドット コム 殿
+X-MS-N-YOMI:eguzanpuru;komu
+ORG:My work company;My division
+X-MS-ORG-YOMI:My work placecompany
+TITLE:My position
+TEL;WORK;VOICE:06-0001-0002
+TEL;HOME;VOICE:06-0001-0001
+TEL;CELL;VOICE:080-0001-0001
+TEL;WORK;FAX:06-0001-0003
+ADR;WORK;PREF:Somewhere;Osaka;Osaka;544-0001;日本
+LABEL;WORK;PREF;ENCODING=QUOTED-PRINTABLE:544-0001=0D=0AOsaka=0D=0AOsaka=0D=0ASomewhere
+URL;WORK:https://example.com
+EMAIL;PREF;INTERNET:test@example.com
+END:VCARD

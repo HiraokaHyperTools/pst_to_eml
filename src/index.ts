@@ -1,13 +1,21 @@
 import { PSTContact, PSTMessage, PSTRecipient } from '@hiraokahypertools/pst-extractor';
 import { PSTFile } from '@hiraokahypertools/pst-extractor';
 import { PSTFolder } from '@hiraokahypertools/pst-extractor';
-import MailComposer from 'nodemailer/lib/mail-composer';
-import { applyFallbackRecipients, changeFileExtension, convertToBuffer, formatAddress, formatFrom } from './utils';
-import { convertVLines } from './vLines';
-import { FasterEmail } from '@hiraokahypertools/pst-extractor/dist/FasterEmail';
-import { Buffer } from 'buffer';
+import { applyFallbackRecipients, changeFileExtension, convertToUint8Array } from './utils.js';
+import { convertVLines } from './vLines.js';
+import { FasterEmail } from '@hiraokahypertools/pst-extractor';
+import { Base64TransferEncoding, EmlWriter, EncodeWordInBase64 } from './EmlWriter.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const utf8Decoder = new TextDecoder('utf-8');
+const utf8Encoder = new TextEncoder();
+
+interface AttachmentRefined {
+  filename: string;
+  content?: Uint8Array;
+  nestedMail?: string;
+  cid?: string;
+}
 
 export async function wrapPstFile(
   pstFile: PSTFile
@@ -175,10 +183,19 @@ export interface MsgConverterOptions {
   baseBoundary?: string;
 
   /**
+  * fixed altBoundary for EML for testing
+  */
+  altBoundary?: string;
+
+  /**
    * fixed messageId for EML for testing
    */
   messageId?: string;
 
+  /**
+   * Whether to allow nested EML. If this is false, nested EML will be treated as attachments with .eml extension. This is because some email clients do not support nested EML.
+   */
+  allowNestedEml?: boolean;
 }
 
 const MAPI_TO = 1;
@@ -257,6 +274,18 @@ export class PItem implements IPItem {
  * @returns The EML data.
  */
 export async function toEmlFrom(options: MsgConverterOptions, email: PSTMessage): Promise<Uint8Array> {
+  const eml = await toEmlStringFrom(options, email);
+  return utf8Encoder.encode(eml);
+}
+
+/**
+ * Convert a PST message to EML format.
+ * 
+ * @param options The conversion options.
+ * @param email The PST message to convert.
+ * @returns The EML data.
+ */
+export async function toEmlStringFrom(options: MsgConverterOptions, email: PSTMessage): Promise<string> {
   const recipients = [];
   for (let x = 0; x < (await email.getNumberOfRecipients()); x++) {
     const entry: PSTRecipient = (await email.getRecipient(x));
@@ -267,85 +296,169 @@ export async function toEmlFrom(options: MsgConverterOptions, email: PSTMessage)
     });
   }
 
-  const attachmentsRefined = [];
-
-  const entity = {
-    baseBoundary: options.baseBoundary,
-
-    from: formatFrom(email.senderName, email.senderEmailAddress),
-    to: applyFallbackRecipients(
-      recipients
-        .map(
-          ({ name, email, recipType }) => {
-            return recipType === MAPI_TO ? formatAddress(name, email) : null
-          }
-        )
-        .filter((entry) => entry !== null), { name: "undisclosed-recipients" }),
-    cc: recipients
-      .map(({ name, email, recipType }) =>
-        recipType === MAPI_CC ? formatAddress(name, email) : null
-      )
-      .filter((entry) => entry !== null),
-    bcc: recipients
-      .map(({ name, email, recipType }) =>
-        recipType === MAPI_BCC ? formatAddress(name, email) : null
-      )
-      .filter((entry) => entry !== null),
-    subject: email.subject,
-    text: email.body,
-    html: email.bodyHTML,
-    attachments: attachmentsRefined,
-    headers: {
-      "Date": (false
-        || email.messageDeliveryTime
-        || email.clientSubmitTime
-        || email.modificationTime
-        || email.creationTime
-        || new Date()
-      ).toString(),
-      "Message-ID": options.messageId,
-    }
-  };
+  const attachmentsRefined: AttachmentRefined[] = [];
 
   for (let x = 0; x < (await email.getNumberOfAttachments()); x++) {
     const attachment = (await email.getAttachment(x));
 
     const embedded = (await attachment.getEmbeddedPSTMessage())
+    const filename = [
+      attachment.longFilename,
+      attachment.filename,
+      attachment.displayName,
+      "unnamed"
+    ]
+      .filter(it => it)[0];
     if (embedded != null) {
-      const emlBuf = await toEmlFrom(options, embedded);
+      if (options.allowNestedEml) {
+        const emlBuf = await toEmlStringFrom(options, embedded);
 
-      attachmentsRefined.push({
-        filename: changeFileExtension(attachment.displayName ?? "unnamed", ".eml"),
-        content: emlBuf,
-        cid: attachment.contentId,
-        contentTransferEncoding: '8bit',
-      })
+        attachmentsRefined.push({
+          filename: changeFileExtension(filename, ".eml"),
+          nestedMail: emlBuf,
+          cid: attachment.contentId,
+        });
+      }
+      else {
+        const emlBuf = await toEmlFrom(options, embedded);
+
+        attachmentsRefined.push({
+          filename: changeFileExtension(filename, ".eml"),
+          content: emlBuf,
+          cid: attachment.contentId,
+        });
+      }
     }
     else {
       attachmentsRefined.push({
-        filename: attachment.displayName,
-        content: convertToBuffer(attachment.fileData),
+        filename: filename,
+        content: convertToUint8Array(attachment.fileData),
         cid: attachment.contentId,
       });
     }
   }
 
-  return await new Promise((resolve, reject) => {
-    try {
-      const mail = new MailComposer(entity);
-      mail.compile().build(function (error, message) {
-        if (error) {
-          reject(new Error("EML composition failed.\n" + error + "\n\n" + error.stack));
-          return;
-        }
-        else {
-          resolve(message);
-        }
-      });
-    } catch (ex) {
-      reject(new Error("EML composition failed.\n" + ex));
+  const boundary = uuidv4();
+  const topBoundary = options.baseBoundary ?? ("_b1" + boundary + "_");
+  const altBoundary = options.altBoundary ?? ("_b2" + boundary + "_");
+
+  const base64Enc = new Base64TransferEncoding();
+  const encodeWordInBase64 = new EncodeWordInBase64();
+
+  const chunks: string[] = [];
+  const emlWriter = new EmlWriter(
+    it => chunks.push(it),
+    word => encodeWordInBase64.encodeIfNeeded(word)
+  );
+  emlWriter
+    .from({ name: email.senderName, email: email.senderEmailAddress })
+    .to(
+      applyFallbackRecipients(
+        recipients
+          .map(
+            ({ name, email, recipType }) => {
+              return recipType === MAPI_TO ? { name, email } : null
+            }
+          )
+          .filter((entry) => entry !== null), { name: "undisclosed-recipients" })
+    )
+    .cc(
+      recipients
+        .map(({ name, email, recipType }) =>
+          recipType === MAPI_CC ? { name, email } : null
+        )
+        .filter((entry) => entry !== null)
+    )
+    .bcc(
+      recipients
+        .map(({ name, email, recipType }) =>
+          recipType === MAPI_BCC ? { name, email } : null
+        )
+        .filter((entry) => entry !== null)
+    )
+    .subject(email.subject)
+    .date(
+      (false
+        || email.messageDeliveryTime
+        || email.clientSubmitTime
+        || email.modificationTime
+        || email.creationTime
+        || new Date()
+      ).toString()
+    )
+    .messageId(options.messageId)
+    .contentTypeMultipartMixed(topBoundary)
+    .mimeVersion1()
+    ;
+
+  if (email.bodyHTML || email.body) {
+    // multipart/alternative
+    emlWriter
+      .newLine()
+      .beginBoundary(topBoundary)
+      .contentTypeMultipartMixed(altBoundary);
+    if (email.bodyHTML) {
+      emlWriter
+        .newLine()
+        .beginBoundary(altBoundary)
+        .contentType("text/html; charset=utf-8")
+        .contentTransferEncoding(base64Enc.name)
+        .newLine()
+        .writeContent(base64Enc.applyStringAsUtf8(email.bodyHTML));
     }
-  });
+    if (email.body) {
+      emlWriter
+        .newLine()
+        .beginBoundary(altBoundary)
+        .contentType("text/plain; charset=utf-8")
+        .contentTransferEncoding(base64Enc.name)
+        .newLine()
+        .writeContent(base64Enc.applyStringAsUtf8(email.body));
+    }
+    emlWriter
+      .newLine()
+      .endBoundary(altBoundary);
+  }
+
+  for (const attachment of attachmentsRefined) {
+    if (attachment.nestedMail) {
+      emlWriter
+        .newLine()
+        .beginBoundary(topBoundary)
+        .contentType(`message/rfc822; name=\"${encodeWordInBase64.encodeIfNeeded(attachment.filename)}\"`)
+        .contentTransferEncoding("7bit");
+      if (attachment.cid) {
+        emlWriter
+          .contentId(attachment.cid);
+      }
+      emlWriter
+        .newLine();
+
+      emlWriter.writeChunks(attachment.nestedMail.split(/\r?\n/).map(line => line + "\r\n"));
+    }
+    else if (attachment.content) {
+      emlWriter
+        .newLine()
+        .beginBoundary(topBoundary)
+        .contentType(`application/octet-stream; name=\"${encodeWordInBase64.encodeIfNeeded(attachment.filename)}\"`)
+        .writeHeader("Content-Disposition", `attachment; filename="${encodeWordInBase64.encodeIfNeeded(attachment.filename)}"`)
+        .contentTransferEncoding(base64Enc.name);
+      if (attachment.cid) {
+        emlWriter
+          .contentId(attachment.cid);
+      }
+      emlWriter
+        .newLine();
+
+      emlWriter.writeContent(base64Enc.applyUint8Array(attachment.content));
+    }
+  }
+
+  emlWriter
+    .endBoundary(topBoundary);
+
+  const eml = chunks.join("");
+  return eml;
 }
 
 /**

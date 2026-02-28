@@ -1,0 +1,86 @@
+From: 
+To: undisclosed-recipients
+Subject: I have sub attachments!
+Date: =?utf-8?B?VGh1IFNlcCAxMCAyMDIwIDE5OjIxOjQxIEdNVCswOTAwICjml6XmnKzmqJnmupbmmYIp?=
+Content-Type: multipart/mixed; boundary="a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f"
+MIME-Version: 1.0
+
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f
+Content-Type: multipart/mixed; boundary="9b9ae776-d66d-4e54-a476-1310e57090fd"
+
+--9b9ae776-d66d-4e54-a476-1310e57090fd
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+SSBoYXZlIHN1YiBhdHRhY2htZW50cyENCg==
+
+--9b9ae776-d66d-4e54-a476-1310e57090fd--
+
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f
+Content-Type: message/rfc822; name="=?utf-8?B?SSBoYXZlIGF0dGFjaG1lbnRzIS5lbWw=?="
+Content-Transfer-Encoding: 7bit
+
+From: 
+To: undisclosed-recipients
+Subject: I have attachments!
+Date: =?utf-8?B?VGh1IFNlcCAxMCAyMDIwIDE5OjE4OjA4IEdNVCswOTAwICjml6XmnKzmqJnmupbmmYIp?=
+Content-Type: multipart/mixed; boundary="a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f"
+MIME-Version: 1.0
+
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f
+Content-Type: multipart/mixed; boundary="9b9ae776-d66d-4e54-a476-1310e57090fd"
+
+--9b9ae776-d66d-4e54-a476-1310e57090fd
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+SSBoYXZlIGF0dGFjaG1lbnRzIQ0K
+
+--9b9ae776-d66d-4e54-a476-1310e57090fd--
+
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f
+Content-Type: message/rfc822; name="=?utf-8?B?TWljcm9zb2Z0IE91dGxvb2sg44OG44K544OIIOODoeODg+OCu+ODvOOCuC5lbWw=?="
+Content-Transfer-Encoding: 7bit
+
+From: Microsoft Outlook <xmailuser@xmailserver.test>
+To: undisclosed-recipients
+Subject: =?utf-8?B?TWljcm9zb2Z0IE91dGxvb2sg44OG44K544OIIOODoeODg+OCu+ODvOOCuA==?=
+Date: =?utf-8?B?VHVlIE1heSAxMiAyMDIwIDE0OjQ1OjE3IEdNVCswOTAwICjml6XmnKzmqJnmupbmmYIp?=
+Content-Type: multipart/mixed; boundary="a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f"
+MIME-Version: 1.0
+
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f
+Content-Type: multipart/mixed; boundary="9b9ae776-d66d-4e54-a476-1310e57090fd"
+
+--9b9ae776-d66d-4e54-a476-1310e57090fd
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+44GT44Gu6Zu75a2Q44Oh44O844OrIOODoeODg+OCu+ODvOOCuOOBr+OAgeOCouOCq+OCpuOD
+s+ODiOOBruioreWumuOBruODhuOCueODiOS4reOBq+OAgU1pY3Jvc29mdCBPdXRsb29rIOOB
+i+OCieiHquWLlemAgeS/oeOBleOCjOOBn+OCguOBruOBp+OBmeOAgiANCg==
+
+--9b9ae776-d66d-4e54-a476-1310e57090fd--
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f--
+
+
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f
+Content-Type: application/octet-stream; name="=?utf-8?B?Z3JlZW4ucG5n?="
+Content-Disposition: attachment; filename="=?utf-8?B?Z3JlZW4ucG5n?="
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAARnQU1B
+AACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAbSURBVDhPY1Da6EMSGtVADBrVQAwa
+dBo2+gAAaskfEIw7Y4QAAAAASUVORK5CYII=
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f--
+
+
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f
+Content-Type: application/octet-stream; name="=?utf-8?B?Ymx1ZS5wbmc=?="
+Content-Disposition: attachment; filename="=?utf-8?B?Ymx1ZS5wbmc=?="
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAARnQU1B
+AACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAbSURBVDhPY7D3OEMSGtVADBrVQAwa
+dBo8zgAArGpTELWXcfIAAAAASUVORK5CYII=
+--a38c05f5-fa4a-4c6c-afc5-29da7f34bb5f--

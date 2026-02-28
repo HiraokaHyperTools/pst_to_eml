@@ -1,8 +1,16 @@
 {
   "name": "@hiraokahypertools/pst_to_eml",
-  "version": "0.2.0-alpha.1",
+  "version": "0.3.0-alpha.1",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js",
+      "browser": "./lib/index.js"
+    }
+  },
   "author": "kenjiuno",
   "license": "MIT",
   "private": false,
@@ -21,9 +29,9 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@hiraokahypertools/pst-extractor": "^0.1.0-alpha.22",
+    "@hiraokahypertools/pst-extractor": "^0.3.0-alpha.1",
     "commander": "^14.0.3",
-    "nodemailer": "8.0.1"
+    "uuid": "^13.0.0"
   },
   "files": [
     "lib",

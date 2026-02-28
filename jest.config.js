@@ -1,6 +1,6 @@
 /** @type {import('jest').Config} */
-module.exports = {
-  preset: 'ts-jest',
+export default {
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   roots: ['<rootDir>/src', '<rootDir>/tests'],
   testMatch: [
@@ -8,7 +8,7 @@ module.exports = {
     '**/*.(test|spec).+(ts|tsx|js)'
   ],
   transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', {
+    '^.+\\.(ts|tsx|js)$': ['ts-jest', {
       tsconfig: 'tsconfig.test.json'
     }]
   },
@@ -24,5 +24,13 @@ module.exports = {
     'html'
   ],
   testTimeout: 10000,
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node']
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@hiraokahypertools/pst-extractor$': '<rootDir>/node_modules/@hiraokahypertools/pst-extractor/dist/index.js',
+    '^uuid$': '<rootDir>/node_modules/uuid/dist/index.js'
+  },
+  transformIgnorePatterns: [
+    "/node_modules/(?!(@hiraokahypertools/pst-extractor|uuid)/)"
+  ],
 };

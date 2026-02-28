@@ -26,7 +26,7 @@ export function convertVLines(vLines: [string | string[], string | string[]][]):
     }
   }
 
-  const lines = [];
+  const lines: string[] = [];
   vLines.forEach(
     vLine => {
       if (vLine[1] === undefined) {

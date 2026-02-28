@@ -1,9 +1,11 @@
-const { openPstFile } = require('@hiraokahypertools/pst-extractor');
-const program = require('commander');
+import { openPstFile } from '@hiraokahypertools/pst-extractor';
+import { Command } from 'commander';
 
-const fs = require('fs');
-const path = require('path');
-const { wrapPstFile } = require('./lib');
+import { promises } from 'fs';
+import { join, normalize, basename, extname } from 'path';
+import { wrapPstFile } from './lib/index.js';
+
+const program = new Command();
 
 function safety(name) {
   return name.replace(/[\"/\\\\\\?<>\\*:\\|]/g, "_");
@@ -13,8 +15,7 @@ function escapeLeadingFrom(eml) {
   return eml.replace(/^([>]*)From([\s])/gm, ">$1From$2");
 }
 
-program
-  .command('tree <pstFilePath>')
+program.command('tree <pstFilePath>')
   .description('Print items tree inside pst file')
   .option('--ansi-encoding <encoding>', 'Set ANSI encoding (used by iconv-lite) for non Unicode text in msg file')
   .action(async (pstFilePath, options) => {
@@ -44,8 +45,7 @@ program
     }
   });
 
-program
-  .command('export <pstFilePath> <saveToDir>')
+program.command('export <pstFilePath> <saveToDir>')
   .description('export items inside pst file')
   .option('--ansi-encoding <encoding>', 'Set ANSI encoding (used by iconv-lite) for non Unicode text in msg file')
   .action(async (pstFilePath, saveToDir, options) => {
@@ -54,11 +54,11 @@ program
       const pst = await wrapPstFile(pstFile);
       try {
         function safeJoin(one, two) {
-          return path.join(one, two);
+          return join(one, two);
         }
 
         async function walk(node, depth, saveToDir) {
-          await fs.promises.mkdir(saveToDir, { recursive: true });
+          await promises.mkdir(saveToDir, { recursive: true });
 
           const prefixTo = (s) => "".padStart(depth, '>') + " " + s;
           for (let item of (await node.items())) {
@@ -66,11 +66,11 @@ program
             console.log(prefixTo("(M) " + displayName));
             if (item.messageClass === "IPM.Note") {
               const emlStr = await item.toEmlStr({});
-              await fs.promises.writeFile(safeJoin(saveToDir, safety(displayName) + ".eml"), emlStr);
+              await promises.writeFile(safeJoin(saveToDir, safety(displayName) + ".eml"), emlStr);
             }
             else if (item.messageClass === "IPM.Contact") {
               const str = await item.toVCardStr({});
-              await fs.promises.writeFile(safeJoin(saveToDir, safety(displayName) + ".vcf"), str);
+              await promises.writeFile(safeJoin(saveToDir, safety(displayName) + ".vcf"), str);
             }
             else {
               console.log(`Unprocessed messageClass: ${item.messageClass}`);
@@ -83,7 +83,7 @@ program
           }
         }
 
-        await walk(pst, 0, path.normalize(saveToDir));
+        await walk(pst, 0, normalize(saveToDir));
       }
       finally {
         pst.close();
@@ -112,8 +112,7 @@ function createUndup() {
   }
 }
 
-program
-  .command('export-mbox <pstFilePath> <saveToDir>')
+program.command('export-mbox <pstFilePath> <saveToDir>')
   .description('export items inside pst file to Thunderbird mbox format')
   .option('--ansi-encoding <encoding>', 'Set ANSI encoding (used by iconv-lite) for non Unicode text in msg file')
   .action(async (pstFilePath, saveToDir, options) => {
@@ -122,12 +121,12 @@ program
       const pst = await wrapPstFile(pstFile);
       try {
         function safeJoin(one, two) {
-          return path.join(one, two);
+          return join(one, two);
         }
 
         async function convert(subFolder, saveTo) {
           console.log("convert", saveTo);
-          const mbox = await fs.promises.open(saveTo, 'w');
+          const mbox = await promises.open(saveTo, 'w');
           try {
             for (let item of (await subFolder.items())) {
               if (item.messageClass === "IPM.Note" || item.messageClass.indexOf("IPM.Document.") === 0) {
@@ -144,7 +143,7 @@ program
         }
 
         async function walk2(node, saveToDir) {
-          await fs.promises.mkdir(saveToDir, { recursive: true });
+          await promises.mkdir(saveToDir, { recursive: true });
 
           const undup = createUndup();
 
@@ -168,7 +167,7 @@ program
           }
         }
 
-        const exportToBase = safeJoin(path.normalize(saveToDir), path.basename(pstFilePath, path.extname(pstFilePath)));
+        const exportToBase = safeJoin(normalize(saveToDir), basename(pstFilePath, extname(pstFilePath)));
         await walk(pst, exportToBase);
       }
       finally {
@@ -180,5 +179,4 @@ program
     }
   });
 
-program
-  .parse(process.argv);
+program.parse(process.argv);

@@ -4,20 +4,7 @@ import * as path from 'node:path';
  * 
  * @internal
  */
-export function formatFrom(senderName: string, senderEmail: string): string {
-  if (senderName) {
-    return `${senderName} <${senderEmail}>`;
-  }
-  else {
-    return `${senderEmail}`;
-  }
-}
-
-/**
- * 
- * @internal
- */
-export function applyFallbackRecipients(array, fallback) {
+export function applyFallbackRecipients(array: Array<any>, fallback: any): Array<any> {
   if (array.length === 0) {
     array.push(fallback);
   }
@@ -37,22 +24,9 @@ export function changeFileExtension(fileName: string, newExt: string): string {
  * 
  * @internal
  */
-export function convertToBuffer(attachmentStream: ArrayBuffer | undefined): Buffer {
+export function convertToUint8Array(attachmentStream: ArrayBuffer | undefined): Uint8Array {
   if (attachmentStream instanceof ArrayBuffer) {
-    return Buffer.from(attachmentStream);
+    return new Uint8Array(attachmentStream);
   }
-  return Buffer.alloc(0);
-}
-
-/**
- * 
- * @internal
- */
-export function formatAddress(name: string, email: string): string | null {
-  if (name) {
-    return `${email} <${name}>`;
-  }
-  else {
-    return email;
-  }
+  return new Uint8Array(0);
 }
