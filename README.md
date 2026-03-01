@@ -13,6 +13,6 @@ yarn add @hiraokahypertools/pst_to_eml
 Usage:
 
 ```js
-  const { MsgConverter } = require('@hiraokahypertools/pst_to_eml');
+import { toEmlFrom, toEmlStringFrom, toVCardStrFrom, wrapPstFile } from '@hiraokahypertools/pst_to_eml';
 
 ```
