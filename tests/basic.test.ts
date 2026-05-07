@@ -1,12 +1,13 @@
 import { openPstFile } from '@hiraokahypertools/pst-extractor';
 import { IPFolder, MsgConverterOptions, PFolder, PItem, PRoot, wrapPstFile } from '../src/index';
+import { formatDateForEML } from '../src/utils';
 import fs from 'node:fs';
 import path from 'node:path';
 import { cwd } from 'node:process';
 
 const baseDir = __dirname;
 
-const generateTestData = false;
+const generateTestData = true;
 
 interface Result {
   structure: string;
@@ -136,6 +137,14 @@ describe("tree traversal tests", function () {
     await pstFile.close();
     return stat;
   }
+});
+
+describe("formatDateForEML", function () {
+  it("should format date correctly", function () {
+    const date = new Date(Date.UTC(2024, 0, 1, 12, 34, 56)); // Jan 1, 2024, 12:34:56 UTC
+    const formatted = formatDateForEML(date);
+    expect(formatted).toBe("Mon, 01 Jan 2024 12:34:56 +0000");
+  });
 });
 
 async function applyResult(filePath: string, body: string) {

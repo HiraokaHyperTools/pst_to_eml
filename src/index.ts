@@ -1,5 +1,5 @@
 import type { IPSTContact, IPSTMessage, IPSTRecipient, IPSTFile, IPSTFolder } from '@hiraokahypertools/pst-extractor';
-import { applyFallbackRecipients, changeFileExtension, convertToUint8Array } from './utils.js';
+import { applyFallbackRecipients, changeFileExtension, convertToUint8Array, formatDateForEML } from './utils.js';
 import { convertVLines } from './vLines.js';
 import { FasterEmail } from '@hiraokahypertools/pst-extractor';
 import { Base64TransferEncoding, EmlWriter, EncodeWordInBase64 } from './EmlWriter.js';
@@ -373,13 +373,13 @@ export async function toEmlStringFrom(options: MsgConverterOptions, email: IPSTM
     )
     .subject(email.subject)
     .date(
-      (false
+      formatDateForEML(false
         || email.messageDeliveryTime
         || email.clientSubmitTime
         || email.modificationTime
         || email.creationTime
         || new Date()
-      ).toString()
+      )
     )
     .messageId(options.messageId)
     .contentTypeMultipartMixed(topBoundary)
