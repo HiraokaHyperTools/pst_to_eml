@@ -31,7 +31,7 @@
   "dependencies": {
     "@hiraokahypertools/pst-extractor": "^0.5.0-alpha.1",
     "commander": "^14.0.3",
-    "uuid": "^13.0.0"
+    "uuid": "14.0.0"
   },
   "files": [
     "lib",
