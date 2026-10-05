@@ -50,8 +50,9 @@
     "dr": "npm publish --dry-run"
   },
   "resolutions": {
-    "js-yaml": "3.15.2",
-    "markdown-it": "14.3.1"
+    "load-nyc-config/js-yaml": "3.15.2",
+    "typedoc/markdown-it": "14.3.1",
+    "minimatch/brace-expansion": "2.1.7"
   },
   "bin": "bin/pst_to_eml"
 }
