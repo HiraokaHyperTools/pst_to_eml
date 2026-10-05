@@ -49,6 +49,9 @@
     "test:coverage": "jest --coverage",
     "dr": "npm publish --dry-run"
   },
-  "resolutions": {},
+  "resolutions": {
+    "js-yaml": "3.15.2",
+    "markdown-it": "14.3.1"
+  },
   "bin": "bin/pst_to_eml"
 }
