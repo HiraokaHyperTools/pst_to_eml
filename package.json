@@ -51,9 +51,7 @@
   },
   "resolutions": {
     "load-nyc-config/js-yaml": "3.15.2",
-    "typedoc/markdown-it": "14.3.1",
-    "brace-expansion": "5.0.12",
-    "markdown-it": "14.3.3"
+    "brace-expansion": "5.0.12"
   },
   "bin": "bin/pst_to_eml"
 }
